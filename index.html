@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="fr" data-lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELIOUSH GAMING - Euro Truck Simulator 2 Mods</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./components/widget.css"> <!-- Chemin corrigé -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rubik+Dirt&family=Barlow+Condensed:wght@400;600;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Firebase SDKs - AJOUTÉS ICI -->
+  <!-- IMPORTANT : Il est recommandé d'utiliser la dernière version stable de Firebase. La version 12.14.0 est la plus récente au 28 mai 2026. -->
+  <!-- Pour une meilleure optimisation (tree-shaking), il est conseillé de passer aux imports modulaires de la v9+ de Firebase plutôt qu'aux versions "compat" chargées via CDN. -->
+  <script src="https://www.gstatic.com/firebasejs/12.14.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.14.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.14.0/firebase-functions-compat.js"></script>
+  <!-- FIN DES AJOUTS Firebase SDKs -->
+
+ </head>
+
+<body>
+
+  <!-- HEADER -->
+  <header class="header" id="mainHeader">
+    <div class="header-container">
+      <div class="logo">
+        <img src="https://i.postimg.cc/rw2ZZHrP/LOGO-Elioush.jpg" alt="Logo ELIOUSH GAMING">
+        <a href="index.html"><span class="Elioush Gaming">ELIOUSH GAMING</span></a>
+      </div>
+      <nav class="nav" id="mainNav">
+        <button class="nav-btn active" data-cat="tous" data-i18n="nav.all">Tous</button>
+        <button class="nav-btn" data-cat="vehicules" data-i18n="nav.vehicles">Véhicules</button>
+        <button class="nav-btn" data-cat="peintures" data-i18n="nav.paints">Peintures</button>
+        <button class="nav-btn" data-cat="cartes" data-i18n="nav.maps">Maps</button>
+        <button class="nav-btn" data-cat="divers" data-i18n="nav.misc">Divers</button>
+        <button class="nav-btn upload-btn" onclick="transitionTo('upload.html')"
+          data-i18n="nav.upload">Upload</button>
+        <!-- BOUTON DE CONNEXION STEAM - MODIFIÉ -->
+        <button class="nav-btn login-btn active" onclick="transitionTo('login.html')" data-i18n="nav.login">Se connecter</button>
+        <!-- FIN MODIFICATION -->
+        <button class="nav-btn contacts-btn"
+          onclick="document.getElementById('footer').scrollIntoView({behavior:'smooth'})"
+          data-i18n="nav.contact">Contact</button>
+      </nav>
+      <div class="header-right">
+        <div class="search-container">
+          <input type="text" id="searchInput" placeholder="🔍 Rechercher un mod..." class="search-input"
+            data-i18n-placeholder="search.placeholder" />
+          <button class="search-btn"><i class="fa fa-search"></i></button>
+          <div id="searchDropdown" class="search-dropdown hidden"></div>
+        </div>
+
+        <!-- Theme toggle with custom icons -->
+        <div class="theme-toggle">
+          <input type="checkbox" id="themeToggle">
+          <label for="themeToggle" class="toggle-label">
+            <span class="sun"><i class="fa fa-sun"></i></span>
+            <span class="moon"><i class="fa fa-moon"></i></span>
+          </label>
+        </div>
+        <button class="hamburger" id="hamburger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MARQUEE -->
+  <div class="marquee-box">
+    <div class="marquee-inner">
+      <span data-i18n="marquee">Bienvenue sur ELIOUSH GAMING &bull; Mods Euro Truck Simulator 2 &bull; Téléchargements
+        gratuits &bull; Nouveaux mods régulièrement &bull; Bienvenue sur ELIOUSH GAMING &bull; Mods Euro Truck Simulator
+        2 &bull; Téléchargements gratuits &bull; Nouveaux mods régulièrement &bull;</span>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main id="mainContent">
+    <div id="modShowcase" class="mod-showcase">
+      <div class="showcase-images" id="showcaseImages"></div>
+      <div class="showcase-info" id="showcaseInfo">
+        <p>Chargement des mods...</p>
+      </div>
+    </div>
+    <!-- COMMENTS SECTION -->
+    <div id="commentsSection" class="comments-section" style="display:none;"></div>
+    <!-- PAGINATION -->
+    <div class="pagination-bar" id="paginationBar"></div>
+
+    <!-- Conteneur potentiel pour une carte - Ajoutez ceci si vous avez l'intention d'afficher une carte sur cette page -->
+    <!-- <div id="map" style="height: 400px; width: 100%;"></div> -->
+  </main>
+
+  <!-- LIGHTBOX -->
+  <div id="lightbox" class="lightbox" role="dialog" aria-modal="true">
+    <button class="lightbox-close" id="lightboxClose" aria-label="Fermer">&times;</button>
+    <img id="lightboxImg" src="" alt="Image agrandie">
+  </div>
+
+  <div id="widget"></div>
+  <div id="footer"></div>
+
+  <script type="module" src="./firebase-config.js"></script>
+  <script type="module" src="./js/db.js"></script>
+  <script type="module" src="script.js"></script>
+  <script type="module" src="js/auth.js"></script>
+
+  <!-- AUTHENTIFICATION STEAM/FIREBASE : le bouton lui-même est dans login.html.
+       Ici on détecte simplement si Steam nous a renvoyé sur cette page avec sa réponse OpenID. -->
+  <script type="module">
+      import { handleSteamCallback } from './js/auth.js';
+
+      // On détecte le retour Steam via les paramètres de l'URL plutôt que via un
+      // chemin "/auth-callback" (qui nécessiterait une réécriture serveur non disponible sur GitHub Pages).
+      if (new URLSearchParams(window.location.search).has('openid.mode')) {
+          handleSteamCallback();
+      }
+  </script>
+
+</body>
+
+</html>

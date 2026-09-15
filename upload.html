@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soumettre un Mod – ELIOUSH GAMING</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./components/widget.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Nosifer&family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Exo+2:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="header" id="mainHeader">
+    <div class="header-container">
+      <div class="logo">
+        <img src="https://i.postimg.cc/rw2ZZHrP/LOGO-Elioush.jpg" alt="Logo">
+        <a href="index.html"><span class="site-title">ELIOUSH GAMING</span></a>
+      </div>
+      <nav class="nav" id="mainNav">
+        <button class="nav-btn" onclick="transitionTo('index.html?cat=tous')">Tous</button>
+        <button class="nav-btn" onclick="transitionTo('index.html?cat=vehicules')">Véhicules</button>
+        <button class="nav-btn" onclick="transitionTo('index.html?cat=peintures')">Peintures</button>
+        <button class="nav-btn" onclick="transitionTo('index.html?cat=cartes')">Maps</button>
+        <button class="nav-btn" onclick="transitionTo('index.html?cat=divers')">Divers</button>
+        <button class="nav-btn upload-btn active" onclick="transitionTo('upload.html')">Upload</button>
+        <button class="nav-btn login-btn" onclick="transitionTo('login.html')">Se connecter</button>
+        <button class="nav-btn contacts-btn" onclick="transitionTo('index.html#footer')">Contacts</button>
+      </nav>
+      <div class="header-right">
+        <div class="search-container">
+          <input type="text" id="searchInput" placeholder="Rechercher un mod..." class="search-input" />
+          <button class="search-btn"><i class="fa fa-search"></i></button>
+          <div id="searchDropdown" class="search-dropdown hidden"></div>
+        </div>
+        <div class="theme-toggle">
+          <input type="checkbox" id="themeToggle">
+          <label for="themeToggle" class="toggle-label">
+            <span class="sun"><i class="fa fa-sun"></i></span>
+            <span class="moon"><i class="fa fa-moon"></i></span>
+          </label>
+        </div>
+        <button class="hamburger" id="hamburger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="marquee-box">
+    <div class="marquee-inner">
+      <span>Bienvenue sur ELIOUSH GAMING &bull; Mods Euro Truck Simulator 2 &bull; Téléchargements gratuits &bull; Nouveaux mods régulièrement &bull; Bienvenue sur ELIOUSH GAMING &bull; Mods Euro Truck Simulator 2 &bull; Téléchargements gratuits &bull; Nouveaux mods régulièrement &bull;</span>
+    </div>
+  </div>
+
+  <!-- UPLOAD FORM -->
+  <main class="upload-main">
+    <div class="upload-wrapper">
+      <div class="upload-header-text">
+        <h1><i class="fa fa-upload"></i> Soumettre un Mod</h1>
+        <p>Partagez votre création avec la communauté Elioush Gaming. Après vérification, votre mod sera publié sur le site.</p>
+      </div>
+
+      <form id="uploadForm" class="upload-form" novalidate>
+
+        <!-- Titre -->
+        <div class="field-group">
+          <label for="modTitle">Titre du mod <span class="required">*</span></label>
+          <input type="text" id="modTitle" name="modTitle" placeholder="Ex: Scania G8 Collection Ivoirienne" maxlength="50" required>
+          <span class="field-hint">Max 50 caractères – <span id="titleCount">0</span>/50</span>
+          <span class="field-error" id="modTitleError"></span>
+        </div>
+
+        <!-- Auteur / Email -->
+        <div class="field-row">
+          <div class="field-group">
+            <label for="modAuthor">Auteur <span class="required">*</span></label>
+            <input type="text" id="modAuthor" name="modAuthor" placeholder="Votre pseudo" required>
+            <span class="field-error" id="modAuthorError"></span>
+          </div>
+          <div class="field-group">
+            <label for="modEmail">Votre email <span class="required">*</span></label>
+            <input type="email" id="modEmail" name="modEmail" placeholder="votre@email.com" required>
+            <span class="field-error" id="modEmailError"></span>
+          </div>
+        </div>
+
+        <!-- Catégorie + Version ETS2 -->
+        <div class="field-row">
+          <div class="field-group">
+            <label for="modCat">Catégorie <span class="required">*</span></label>
+            <select id="modCat" name="modCat" required>
+              <option value="">— Choisir —</option>
+              <option value="vehicules">Véhicules</option>
+              <option value="peintures">Peintures</option>
+              <option value="cartes">Cartes / Maps</option>
+              <option value="divers">Divers</option>
+            </select>
+            <span class="field-error" id="modCatError"></span>
+          </div>
+          <div class="field-group">
+            <label for="modVersion">Version ETS2 compatible <span class="required">*</span></label>
+            <input type="text" id="modVersion" name="modVersion" placeholder="Ex: 1.50.x" required>
+            <span class="field-error" id="modVersionError"></span>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="field-group">
+          <label for="modDesc">Description <span class="required">*</span></label>
+          <textarea id="modDesc" name="modDesc" rows="5" placeholder="Décrivez votre mod en détail : fonctionnalités, véhicules inclus, compatibilités..." required></textarea>
+          <span class="field-error" id="modDescError"></span>
+        </div>
+
+        <!-- Images (URLs) -->
+        <div class="field-group">
+          <label for="modImages">Images du mod (URLs) <span class="required">*</span> <span class="badge">max 4</span></label>
+          <div id="imageInputs">
+            <div class="image-input-row">
+              <input type="url" class="mod-image-input" placeholder="https://..." >
+              <button type="button" class="add-image-btn" id="addImageBtn"><i class="fa fa-plus"></i></button>
+            </div>
+          </div>
+          <span class="field-hint">Liens directs vers vos images (jpg, png…). Séparez chaque URL dans un champ distinct.</span>
+          <span class="field-error" id="modImagesError"></span>
+        </div>
+
+        <!-- Liens de téléchargement (max 2) -->
+        <div class="field-group">
+          <label>Liens de téléchargement <span class="required">*</span> <span class="badge">max 2</span></label>
+          <div class="download-link-row">
+            <select class="dl-type-select" id="dlType1">
+              <option value="mediafire">MediaFire</option>
+              <option value="sharemods">ShareMods</option>
+              <option value="routesync">RouteSync Launcher</option>
+              <option value="autre">Autre</option>
+            </select>
+            <input type="url" id="dlLink1" name="dlLink1" placeholder="https://www.mediafire.com/..." required>
+          </div>
+          <div class="download-link-row" id="dlRow2" style="display:none;">
+            <select class="dl-type-select" id="dlType2">
+              <option value="mediafire">MediaFire</option>
+              <option value="sharemods">ShareMods</option>
+              <option value="routesync">RouteSync Launcher</option>
+              <option value="autre">Autre</option>
+            </select>
+            <input type="url" id="dlLink2" name="dlLink2" placeholder="https://routesynclauncher.com/...">
+          </div>
+          <button type="button" class="add-link-btn" id="addLinkBtn"><i class="fa fa-plus"></i> Ajouter un 2e lien</button>
+          <span class="field-error" id="dlLinkError"></span>
+        </div>
+
+        <!-- RouteSync info -->
+        <div class="routesync-info">
+          <i class="fa fa-info-circle"></i>
+          <div>
+            <strong>RouteSync Launcher</strong> – Pour distribuer votre mod via RouteSync, créez un compte sur 
+            <a href="https://routesynclauncher.com/" target="_blank">routesynclauncher.com</a> 
+            et liez-le à votre Steam. Les utilisateurs devront posséder le mod pour y accéder.
+          </div>
+        </div>
+
+        <!-- Acceptation des conditions -->
+        <div class="field-group checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="acceptTerms" required>
+            <span>Je certifie être l'auteur ou avoir les droits de distribution de ce mod. Je comprends que le mod sera vérifié avant publication.</span>
+          </label>
+          <span class="field-error" id="termsError"></span>
+        </div>
+
+        <!-- Boutons -->
+        <div class="form-actions">
+          <button type="submit" class="submit-btn" id="submitBtn">
+            <i class="fa fa-paper-plane"></i> Soumettre le mod
+          </button>
+          <button type="reset" class="reset-btn" id="resetBtn">
+            <i class="fa fa-undo"></i> Réinitialiser
+          </button>
+        </div>
+
+        <!-- Message résultat -->
+        <div id="formMessage" class="form-message" style="display:none;"></div>
+
+      </form>
+    </div>
+  </main>
+
+  <div id="widget"></div>
+  <div id="footer"></div>
+  <script type="module" src="./firebase-config.js"></script>
+  <script type="module" src="./js/db.js"></script>
+  <script type="module" src="./script.js"></script>
+</body>
+</html>

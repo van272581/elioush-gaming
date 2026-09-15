@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr" data-lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion – ELIOUSH GAMING</title>
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./components/widget.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <header class="header" id="mainHeader">
+    <div class="header-container">
+
+      <div class="logo">
+        <img src="https://i.postimg.cc/rw2ZZHrP/LOGO-Elioush.jpg" alt="Logo">
+
+        <a href="index.html">
+          <span class="Elioush Gaming">ELIOUSH GAMING</span>
+        </a>
+      </div>
+
+      <nav class="nav" id="mainNav">
+
+        <button class="nav-btn" data-cat="tous"
+          onclick="transitionTo('index.html?cat=tous')"
+          data-i18n="nav.all">
+          Tous
+        </button>
+
+        <button class="nav-btn" data-cat="vehicules"
+          onclick="transitionTo('index.html?cat=vehicules')"
+          data-i18n="nav.vehicles">
+          Véhicules
+        </button>
+
+        <button class="nav-btn" data-cat="peintures"
+          onclick="transitionTo('index.html?cat=peintures')"
+          data-i18n="nav.paints">
+          Peintures
+        </button>
+
+        <button class="nav-btn" data-cat="cartes"
+          onclick="transitionTo('index.html?cat=cartes')"
+          data-i18n="nav.maps">
+          Maps
+        </button>
+
+        <button class="nav-btn" data-cat="divers"
+          onclick="transitionTo('index.html?cat=divers')"
+          data-i18n="nav.misc">
+          Divers
+        </button>
+
+        <button class="nav-btn upload-btn"
+          onclick="transitionTo('upload.html')"
+          data-i18n="nav.upload"
+          data-cat="upload">
+          Upload
+        </button>
+
+        <button class="nav-btn login-btn active"
+          onclick="transitionTo('login.html')"
+          data-i18n="nav.login"
+          data-cat="login">
+          Se connecter
+        </button>
+
+        <button class="nav-btn contacts-btn"
+          onclick="transitionTo('index.html#footer')"
+          data-i18n="nav.contact">
+          Contact
+        </button>
+
+      </nav>
+
+      <div class="header-right">
+
+        <div class="search-container">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="🔍 Rechercher un mod..."
+            class="search-input">
+          <button class="search-btn">
+            <i class="fa fa-search"></i>
+          </button>
+          <div id="searchDropdown" class="search-dropdown hidden"></div>
+        </div>
+
+        <div class="lang-switch">
+          <button class="lang-btn active" data-lang="fr">FR</button>
+          <span class="lang-sep">|</span>
+          <button class="lang-btn" data-lang="en">EN</button>
+        </div>
+
+        <div class="theme-toggle">
+          <input type="checkbox" id="themeToggle">
+          <label for="themeToggle" class="toggle-label">
+            <span class="sun"><i class="fa fa-sun"></i></span>
+            <span class="moon"><i class="fa fa-moon"></i></span>
+          </label>
+        </div>
+
+        <button class="hamburger" id="hamburger" aria-label="Menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+      </div>
+
+    </div>
+  </header>
+
+  <div class="marquee-box">
+    <div class="marquee-inner">
+      <span>
+        Bienvenue sur ELIOUSH GAMING • Mods Euro Truck Simulator 2 •
+        Connectez-vous pour publier • Bienvenue sur ELIOUSH GAMING •
+        Mods Euro Truck Simulator 2 • Connectez-vous pour publier •
+      </span>
+    </div>
+  </div>
+
+  <main class="login-main">
+
+    <div class="login-card">
+
+      <img
+        src="https://i.postimg.cc/rw2ZZHrP/LOGO-Elioush.jpg"
+        alt="Logo"
+        class="login-logo">
+
+      <h1 class="login-title" data-i18n="login.title">
+        Se connecter
+      </h1>
+
+      <p class="login-sub" id="loginSwitchText">
+        <span id="loginSwitchPrefix">Nouveau ?</span>
+        <a href="#" id="toggleRegisterLink" class="login-link" data-i18n="login.create">
+          Créer un compte
+        </a>
+      </p>
+
+      <div id="loginStatus"
+           class="login-status"
+           style="display:none;"></div>
+
+      <div id="steamLinkStatus" class="steam-link-status hidden"></div>
+      <div id="steamLinkInfo" class="steam-link-info hidden">
+        <div class="steam-data">
+          <span class="steam-data-label">Steam ID :</span>
+          <span id="steamIdValue" class="steam-data-value"></span>
+        </div>
+        <div class="steam-data">
+          <span class="steam-data-label">Compte Steam :</span>
+          <span id="steamNameValue" class="steam-data-value"></span>
+        </div>
+      </div>
+
+      <form id="loginForm" class="login-form">
+
+        <div class="login-field">
+          <label data-i18n="login.email">E-mail</label>
+
+          <input
+            type="email"
+            id="loginEmail"
+            placeholder="votre@email.com"
+            required>
+        </div>
+
+        <div class="login-field">
+          <label data-i18n="login.password">
+            Mot de passe
+          </label>
+
+          <input
+            type="password"
+            id="loginPassword"
+            placeholder="••••••••"
+            required>
+
+          <a href="#"
+             class="forgot-link"
+             data-i18n="login.forgot">
+            Mot de passe oublié ?
+          </a>
+        </div>
+
+        <div class="login-field register-only hidden">
+          <label data-i18n="login.confirmPassword">
+            Confirmer le mot de passe
+          </label>
+
+          <input
+            type="password"
+            id="loginConfirmPassword"
+            placeholder="••••••••"
+            autocomplete="new-password">
+        </div>
+
+        <div class="login-field">
+          <label data-i18n="login.steamId">
+            Steam ID <small>(optionnel)</small>
+          </label>
+
+          <input
+            type="text"
+            id="loginSteamId"
+            placeholder="12345678901234567">
+
+          <span class="field-hint" data-i18n="login.steamIdHint">
+            Entrez votre Steam ID ou utilisez le bouton Steam.
+          </span>
+        </div>
+
+        <div class="login-remember">
+          <input type="checkbox" id="rememberMe">
+
+          <label for="rememberMe"
+                 data-i18n="login.remember">
+            Se souvenir de moi
+          </label>
+        </div>
+
+        <div class="captcha-box">
+          <div class="captcha-inner">
+
+            <span class="captcha-check">
+              <i class="fa fa-check-circle"
+                 style="color:#22c55e;font-size:22px;"></i>
+            </span>
+
+            <span class="captcha-text">
+              Succès !
+            </span>
+
+            <span class="captcha-cf">
+              CLOUDFLARE
+              <br>
+              <small>Confidentialité · Aide</small>
+            </span>
+
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          class="login-btn-submit"
+          data-i18n="login.btn">
+          Connexion
+        </button>
+
+      </form>
+
+      <div class="login-or">
+        <span data-i18n="login.or">OU</span>
+      </div>
+
+      <a
+        href="#"
+        class="steam-btn"
+        id="steamBtn"
+        onclick="signInWithSteam(); return false;">
+
+        <img
+          src="https://upload.wikimedia.org/wikipedia/commons/8/83/Steam_icon_logo.svg"
+          alt="Steam"
+          width="22"
+          height="22">
+
+        <span data-i18n="login.steam">
+          Continuer avec Steam
+        </span>
+
+      </a>
+
+      <p class="steam-note"
+         data-i18n="login.steamNote">
+        Uniquement pour les membres existants avec un compte Steam lié
+      </p>
+
+      <a
+        href="https://discord.gg/CM7JNnd3Uc"
+        target="_blank"
+        class="discord-btn"
+        id="discordBtn">
+
+        <i class="fa-brands fa-discord"></i>
+
+        <span data-i18n="login.discord">
+          Rejoindre et vérifier via Discord
+        </span>
+
+      </a>
+
+      <p class="discord-note"
+         data-i18n="login.discordNote">
+        Rejoignez le serveur Discord pour activer votre compte membre
+      </p>
+
+    </div>
+
+  </main>
+
+  <div id="widget"></div>
+  <div id="footer"></div>
+
+  <!-- Firebase -->
+
+  <script type="module" src="./firebase-config.js"></script>
+  <script type="module" src="./js/db.js"></script>
+  <script type="module">
+    import { signInWithSteam, handleSteamCallback } from './js/auth.js';
+    window.signInWithSteam = signInWithSteam;
+
+    // Si Steam nous renvoie ici avec sa réponse OpenID, on finalise la connexion.
+    if (new URLSearchParams(window.location.search).has('openid.mode')) {
+      handleSteamCallback();
+    }
+  </script>
+
+  <!-- Script principal -->
+  <script type="module" src="./script.js"></script>
+
+</body>
+</html>
