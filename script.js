@@ -55,6 +55,8 @@ const i18n = {
     'pub.date': 'Publié le', 'pub.author': 'Auteur',
     'pg.of': 'sur',
     'upload.title': '📤 Soumettre un Mod',
+    'contact.title': 'Nous contacter',
+    'contact.sub': 'Une question, un mod à proposer, un bug à signaler ? Écrivez-nous directement.',
   },
   en: {
     'nav.all': 'All', 'nav.vehicles': 'Vehicles', 'nav.paints': 'Paints',
@@ -90,6 +92,8 @@ const i18n = {
     'pub.date': 'Published', 'pub.author': 'Author',
     'pg.of': 'of',
     'upload.title': '📤 Submit a Mod',
+    'contact.title': 'Contact us',
+    'contact.sub': 'A question, a mod to suggest, a bug to report? Write to us directly.',
   }
 };
 
@@ -127,36 +131,33 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   applyTranslations();
   const loginTitle = document.querySelector('.login-title');
-  const loginSwitchPrefix = document.getElementById('loginSwitchPrefix');
-  const toggleRegisterLink = document.getElementById('toggleRegisterLink');
+  const tabLogin = document.getElementById('tabLogin');
+  const tabRegister = document.getElementById('tabRegister');
   const submitButton = document.querySelector('.login-btn-submit');
   const confirmPasswordField = document.querySelector('.register-only');
 
   function updateLoginMode(mode) {
     loginMode = mode;
-    if (!loginTitle || !toggleRegisterLink || !loginSwitchPrefix || !submitButton) return;
+    if (!loginTitle || !tabLogin || !tabRegister || !submitButton) return;
+
+    tabLogin.classList.toggle('active', mode === 'login');
+    tabLogin.setAttribute('aria-selected', mode === 'login');
+    tabRegister.classList.toggle('active', mode === 'register');
+    tabRegister.setAttribute('aria-selected', mode === 'register');
 
     if (mode === 'register') {
       loginTitle.textContent = t('login.registerTitle');
       submitButton.textContent = t('login.register');
-      toggleRegisterLink.textContent = t('login.login');
-      loginSwitchPrefix.textContent = `${t('login.already')} `;
       confirmPasswordField?.classList.remove('hidden');
     } else {
       loginTitle.textContent = t('login.title');
       submitButton.textContent = t('login.btn');
-      toggleRegisterLink.textContent = t('login.create');
-      loginSwitchPrefix.textContent = `${t('login.accountText')} `;
       confirmPasswordField?.classList.add('hidden');
     }
   }
 
-  if (toggleRegisterLink) {
-    toggleRegisterLink.addEventListener('click', e => {
-      e.preventDefault();
-      updateLoginMode(loginMode === 'login' ? 'register' : 'login');
-    });
-  }
+  tabLogin?.addEventListener('click', () => updateLoginMode('login'));
+  tabRegister?.addEventListener('click', () => updateLoginMode('register'));
 
   updateLoginMode('login');
 });
@@ -185,6 +186,11 @@ const hamburger = document.getElementById("hamburger");
 const mainNav = document.getElementById("mainNav");
 if (hamburger && mainNav) {
   hamburger.addEventListener("click", () => mainNav.classList.toggle("open"));
+  // Referme le menu déroulant dès qu'un lien/bouton de navigation est utilisé,
+  // sinon sur mobile il reste ouvert par-dessus la page après un clic.
+  mainNav.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => mainNav.classList.remove('open'));
+  });
 }
 
 // ===================================================
@@ -784,7 +790,7 @@ async function renderShowcase(mod) {
   showcaseInfo.querySelectorAll('.dl-btn[data-url]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const url = btn.getAttribute('data-url');
-      const id = parseInt(btn.getAttribute('data-mod-id'));
+      const id = btn.getAttribute('data-mod-id');
       if (url === '#' || !url) return;
       btn.classList.add('animating');
       try {
@@ -871,6 +877,7 @@ async function renderSearchPreview(keyword) {
 
   if (results.length === 0) {
     searchDropdown.innerHTML = `<div class="search-empty">${currentLang === 'fr' ? 'Aucun mod ne correspond à votre recherche.' : 'No mods match your search.'}</div>`;
+    searchDropdown.classList.remove('hidden');
     searchDropdown.classList.add('visible');
     return;
   }
@@ -878,7 +885,7 @@ async function renderSearchPreview(keyword) {
   searchDropdown.innerHTML = results.map(mod => {
     const thumb = mod.images?.[0] || 'https://via.placeholder.com/120x120?text=Mod';
     return `
-      <div class="search-item" data-title="${encodeURIComponent(mod.title)}">
+      <div class="search-item" data-id="${encodeURIComponent(mod.id)}">
         <img class="search-item-thumb" src="${thumb}" alt="${mod.title}">
         <div>
           <div class="search-item-title">${mod.title}</div>
@@ -887,19 +894,16 @@ async function renderSearchPreview(keyword) {
       </div>
     `;
   }).join('');
+  searchDropdown.classList.remove('hidden');
   searchDropdown.classList.add('visible');
   searchDropdown.querySelectorAll('.search-item').forEach(item => {
     item.addEventListener('click', () => {
-      const title = decodeURIComponent(item.dataset.title || '');
-      if (!title) return;
-      if (window.location.pathname.endsWith('index.html') || window.location.pathname === '/' || window.location.pathname === '') {
-        searchInput.value = title;
-        searchDropdown.classList.remove('visible');
-        const cat = document.querySelector('.nav-btn.active')?.dataset.cat || 'tous';
-        filterMods(cat, title);
-      } else {
-        transitionTo(`index.html?q=${encodeURIComponent(title)}`);
-      }
+      const id = decodeURIComponent(item.dataset.id || '');
+      if (!id) return;
+      searchDropdown.classList.remove('visible');
+      // Toujours naviguer directement vers la fiche du mod via son id,
+      // comme le fait la preview de recherche d'anime-sama.
+      transitionTo(`index.html?id=${encodeURIComponent(id)}`);
     });
   });
 }
@@ -927,9 +931,16 @@ if (showcaseImages) {
 
   if (initId !== null) {
     getAllMods().then(all => {
-      filteredMods = all.filter(m => m.cat === (all[initId]?.cat || 'peintures'));
-      const pg = filteredMods.findIndex(m => m.id === parseInt(initId));
-      currentPage = pg >= 0 ? pg : 0;
+      const target = all.find(m => String(m.id) === String(initId));
+      if (target) {
+        filteredMods = all.filter(m => m.cat === target.cat);
+        const pg = filteredMods.findIndex(m => String(m.id) === String(initId));
+        currentPage = pg >= 0 ? pg : 0;
+      } else {
+        // Id inconnu (mod supprimé, lien obsolète...) : on retombe sur la liste complète.
+        filteredMods = all;
+        currentPage = 0;
+      }
       updateShowcase();
     });
   } else {

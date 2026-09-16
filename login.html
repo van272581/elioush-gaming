@@ -76,7 +76,7 @@
         </button>
 
         <button class="nav-btn contacts-btn"
-          onclick="transitionTo('index.html#footer')"
+          onclick="transitionTo('index.html#contact')"
           data-i18n="nav.contact">
           Contact
         </button>
@@ -94,7 +94,7 @@
           <button class="search-btn">
             <i class="fa fa-search"></i>
           </button>
-          <div id="searchDropdown" class="search-dropdown hidden"></div>
+          <div id="searchDropdown" class="search-dropdown"></div>
         </div>
 
         <div class="lang-switch">
@@ -145,12 +145,14 @@
         Se connecter
       </h1>
 
-      <p class="login-sub" id="loginSwitchText">
-        <span id="loginSwitchPrefix">Nouveau ?</span>
-        <a href="#" id="toggleRegisterLink" class="login-link" data-i18n="login.create">
+      <div class="login-tabs" role="tablist">
+        <button type="button" class="login-tab active" id="tabLogin" role="tab" aria-selected="true" data-i18n="login.login">
+          Se connecter
+        </button>
+        <button type="button" class="login-tab" id="tabRegister" role="tab" aria-selected="false" data-i18n="login.register">
           Créer un compte
-        </a>
-      </p>
+        </button>
+      </div>
 
       <div id="loginStatus"
            class="login-status"

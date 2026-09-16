@@ -46,7 +46,7 @@
         <button class="nav-btn login-btn active" onclick="transitionTo('login.html')" data-i18n="nav.login">Se connecter</button>
         <!-- FIN MODIFICATION -->
         <button class="nav-btn contacts-btn"
-          onclick="document.getElementById('footer').scrollIntoView({behavior:'smooth'})"
+          onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})"
           data-i18n="nav.contact">Contact</button>
       </nav>
       <div class="header-right">
@@ -54,7 +54,7 @@
           <input type="text" id="searchInput" placeholder="🔍 Rechercher un mod..." class="search-input"
             data-i18n-placeholder="search.placeholder" />
           <button class="search-btn"><i class="fa fa-search"></i></button>
-          <div id="searchDropdown" class="search-dropdown hidden"></div>
+          <div id="searchDropdown" class="search-dropdown"></div>
         </div>
 
         <!-- Theme toggle with custom icons -->
@@ -97,6 +97,28 @@
     <!-- Conteneur potentiel pour une carte - Ajoutez ceci si vous avez l'intention d'afficher une carte sur cette page -->
     <!-- <div id="map" style="height: 400px; width: 100%;"></div> -->
   </main>
+
+  <!-- CONTACT — section à part entière, distincte du footer du site -->
+  <section id="contact" class="contact-section-page">
+    <div class="contact-container">
+      <h2 class="contact-heading" data-i18n="contact.title">Nous contacter</h2>
+      <p class="contact-sub" data-i18n="contact.sub">Une question, un mod à proposer, un bug à signaler ? Écrivez-nous directement.</p>
+      <div class="contact-channels">
+        <a class="contact-channel" href="https://wa.me/2250546445542?text=Bonjour%20ELIOUSH%20GAMING" target="_blank">
+          <i class="fa-brands fa-whatsapp"></i>
+          <span>WhatsApp</span>
+        </a>
+        <a class="contact-channel" href="https://discord.gg/DKY7UQ4E" target="_blank">
+          <i class="fa-brands fa-discord"></i>
+          <span>Discord</span>
+        </a>
+        <a class="contact-channel" href="https://www.tiktok.com/@elioush_gaming" target="_blank">
+          <i class="fa-brands fa-tiktok"></i>
+          <span>TikTok</span>
+        </a>
+      </div>
+    </div>
+  </section>
 
   <!-- LIGHTBOX -->
   <div id="lightbox" class="lightbox" role="dialog" aria-modal="true">

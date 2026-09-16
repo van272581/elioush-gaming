@@ -245,6 +245,66 @@ img { display: block; max-width: 100%; }
   color: rgba(255,255,255,0.72);
 }
 
+/* ===================================================
+   CONTACT — section à part entière, distincte du footer
+   =================================================== */
+.contact-section-page {
+  background: var(--bg-card);
+  border-top: 1px solid rgba(255,130,0,0.18);
+  border-bottom: 1px solid rgba(255,130,0,0.18);
+  padding: 60px 20px;
+  margin-top: 20px;
+  scroll-margin-top: 90px; /* évite que le header sticky ne masque le titre au clic sur "Contact" */
+}
+.contact-container {
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+.contact-heading {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(26px, 4vw, 38px);
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-shadow: var(--h-shadow);
+  margin-bottom: 10px;
+}
+.contact-sub {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-family: Helvetica, Arial, sans-serif;
+  margin-bottom: 30px;
+}
+.contact-channels {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+.contact-channel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 130px;
+  padding: 22px 14px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid rgba(100,100,120,0.2);
+  color: var(--text);
+  text-decoration: none;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 1px;
+  transition: all var(--tr);
+}
+.contact-channel i { font-size: 26px; color: var(--accent); }
+.contact-channel:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(255,130,0,0.25);
+}
+
 .hidden {
   display: none !important;
 }
@@ -1232,16 +1292,37 @@ body.dark .routesync-info { background: rgba(255,130,0,0.05); }
 }
 
 @media (max-width: 768px) {
-  .header-container { flex-wrap: wrap; }
+  .header-container { flex-wrap: wrap; position: relative; }
   .nav {
     display: none; flex-direction: column;
     width: 100%; gap: 6px; padding: 10px 0; order: 5;
+    position: relative; z-index: 901; pointer-events: auto;
   }
   .nav.open { display: flex; }
   .nav-btn { width: 100%; text-align: center; border-radius: 8px; }
-  .hamburger { display: flex; }
-  .search-container { width: 150px; }
-  .search-container:focus-within { width: 200px; }
+  /* Icône hamburger centrée dans la barre d'en-tête plutôt que collée au bord,
+     avec un fond propre pour qu'elle ne se retrouve jamais visuellement
+     coincée entre la recherche et le sélecteur de thème. */
+  .hamburger {
+    display: flex;
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 950;
+    pointer-events: auto;
+    background: rgba(0,0,0,0.28);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  /* Sépare visuellement les filtres de catégorie des liens vers d'autres pages
+     dans le menu déroulant mobile, pour que ces derniers soient reconnaissables. */
+  .nav.open .upload-btn {
+    margin-top: 8px;
+    border-top: 1px solid rgba(255,255,255,0.18);
+    padding-top: 15px;
+  }
+  .search-container { width: 130px; }
+  .search-container:focus-within { width: 180px; }
   .showcase-images img { height: 180px; }
   .upload-form { padding: 22px 16px; }
   .download-link-row { flex-direction: column; }
@@ -1298,6 +1379,36 @@ body.dark .routesync-info { background: rgba(255,130,0,0.05); }
 .login-sub { font-size: 13px; color: var(--text-muted); font-family: Helvetica, sans-serif; }
 .login-link { color: var(--accent); font-weight: 700; }
 .login-link:hover { text-decoration: underline; }
+
+/* Onglets Se connecter / Créer un compte — structure claire, distincte */
+.login-tabs {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid rgba(100,100,120,0.22);
+  border-radius: 10px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.login-tab {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all var(--tr);
+}
+.login-tab:hover { color: var(--text); }
+.login-tab.active {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(255,130,0,0.35);
+}
 
 .login-status {
   padding: 12px 16px; border-radius: 8px;
