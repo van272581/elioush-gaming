@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr" data-lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mon compte – ELIOUSH GAMING</title>
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="./components/widget.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+  <header class="header" id="mainHeader">
+    <div class="header-container">
+
+      <div class="logo">
+        <img src="https://i.postimg.cc/rw2ZZHrP/LOGO-Elioush.jpg" alt="Logo">
+        <a href="index.html">
+          <span class="Elioush Gaming">ELIOUSH GAMING</span>
+        </a>
+      </div>
+
+      <nav class="nav" id="mainNav">
+        <button class="nav-btn" data-cat="tous" onclick="transitionTo('index.html?cat=tous')" data-i18n="nav.all">Tous</button>
+        <button class="nav-btn" data-cat="vehicules" onclick="transitionTo('index.html?cat=vehicules')" data-i18n="nav.vehicles">Véhicules</button>
+        <button class="nav-btn" data-cat="peintures" onclick="transitionTo('index.html?cat=peintures')" data-i18n="nav.paints">Peintures</button>
+        <button class="nav-btn" data-cat="cartes" onclick="transitionTo('index.html?cat=cartes')" data-i18n="nav.maps">Maps</button>
+        <button class="nav-btn" data-cat="divers" onclick="transitionTo('index.html?cat=divers')" data-i18n="nav.misc">Divers</button>
+        <button class="nav-btn upload-btn" onclick="transitionTo('upload.html')" data-i18n="nav.upload">Upload</button>
+        <button class="nav-btn login-btn active" data-i18n="nav.login">Se connecter</button>
+        <button class="nav-btn contacts-btn" onclick="transitionTo('index.html#contact')" data-i18n="nav.contact">Contact</button>
+      </nav>
+
+      <div class="header-right">
+        <div class="search-container">
+          <input type="text" id="searchInput" placeholder="🔍 Rechercher un mod..." class="search-input" data-i18n-placeholder="search.placeholder" />
+          <button class="search-btn"><i class="fa fa-search"></i></button>
+          <div id="searchDropdown" class="search-dropdown"></div>
+        </div>
+
+        <div class="theme-toggle">
+          <input type="checkbox" id="themeToggle">
+          <label for="themeToggle" class="toggle-label">
+            <span class="sun"><i class="fa fa-sun"></i></span>
+            <span class="moon"><i class="fa fa-moon"></i></span>
+          </label>
+        </div>
+
+        <button class="hamburger" id="hamburger" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <div class="marquee-box">
+    <div class="marquee-inner">
+      <span data-i18n="marquee">Bienvenue sur ELIOUSH GAMING &bull; Mods Euro Truck Simulator 2 &bull; Téléchargements gratuits &bull; Nouveaux mods régulièrement &bull;</span>
+    </div>
+  </div>
+
+  <main class="account-main">
+    <div id="accountLoading" class="account-status-msg" data-i18n="account.loading">Chargement de votre profil...</div>
+
+    <div id="accountContent" class="account-content hidden">
+      <section class="account-card">
+        <div class="account-card-top">
+          <div class="account-avatar" id="accountAvatar">?</div>
+          <div class="account-meta">
+            <span class="account-eyebrow">MEMBER AREA</span>
+            <h1 class="account-name" id="accountName">—</h1>
+            <p class="account-email" id="accountEmail">—</p>
+          </div>
+        </div>
+
+        <div class="account-badges">
+          <span class="account-badge" id="accountRoleBadge">—</span>
+          <span class="account-badge account-badge-muted" id="accountSince">—</span>
+        </div>
+
+        <div class="account-summary-grid">
+          <div class="account-info-card">
+            <span class="account-card-label">Activation</span>
+            <strong id="accountActivationStatus">En attente</strong>
+          </div>
+          <div class="account-info-card">
+            <span class="account-card-label">Profil</span>
+            <strong id="accountProfileStatus">Membre</strong>
+          </div>
+        </div>
+
+        <div class="account-status-panel">
+          <i class="fa-solid fa-shield-check"></i>
+          <span>Votre accès membre est validé selon votre statut Discord et votre profil.</span>
+        </div>
+
+        <div class="account-actions">
+          <a href="index.html" class="account-cta secondary">Retour au catalogue</a>
+          <button class="account-logout-btn" id="accountLogoutBtn" data-i18n="account.logout">Se déconnecter</button>
+        </div>
+      </section>
+
+      <section class="account-history">
+        <h2 data-i18n="account.historyTitle">Historique de téléchargements</h2>
+        <div id="accountHistoryList" class="account-history-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <div id="widget"></div>
+  <div id="footer"></div>
+
+  <script type="module" src="./firebase-config.js"></script>
+  <script type="module" src="./js/db.js"></script>
+
+  <!-- Script principal (i18n, thème, menu, session partagée) -->
+  <script type="module" src="./script.js"></script>
+
+  <script type="module">
+    import { onUserStateChange, getUserProfile, getUserDownloadHistory, logoutUser } from './js/db.js';
+
+    const lang = (navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'fr';
+    const roleLabels = {
+      fr: { member: 'Membre', admin: 'Administrateur' },
+      en: { member: 'Member', admin: 'Administrator' }
+    };
+    const steamLabel = {
+      fr: id => `Compte Steam lié : ${id}`,
+      en: id => `Linked Steam account: ${id}`
+    };
+    const historyEmpty = { fr: 'Vous n\'avez encore téléchargé aucun mod.', en: 'You haven\'t downloaded any mods yet.' };
+    const notLoggedIn = { fr: 'Vous devez être connecté pour voir cette page. Redirection...', en: 'You must be logged in to view this page. Redirecting...' };
+
+    function formatDate(ts) {
+      try {
+        const d = ts?.toDate ? ts.toDate() : new Date(ts);
+        return d.toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+      } catch { return ''; }
+    }
+
+    onUserStateChange(async (user) => {
+      const loadingEl = document.getElementById('accountLoading');
+      const contentEl = document.getElementById('accountContent');
+
+      if (!user) {
+        if (loadingEl) loadingEl.textContent = notLoggedIn[lang] || notLoggedIn.fr;
+        setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+        return;
+      }
+
+      const profile = await getUserProfile(user.uid).catch(() => null);
+      const name = profile?.name || user.email?.split('@')[0] || '—';
+
+      document.getElementById('accountAvatar').textContent = name.charAt(0).toUpperCase();
+      document.getElementById('accountName').textContent = name;
+      document.getElementById('accountEmail').textContent = user.email || '';
+
+      const role = profile?.role === 'admin' ? 'admin' : 'member';
+      const accountRoleBadge = document.getElementById('accountRoleBadge');
+      const activationStatus = document.getElementById('accountActivationStatus');
+      const profileStatus = document.getElementById('accountProfileStatus');
+
+      accountRoleBadge.textContent = (roleLabels[lang] || roleLabels.fr)[role];
+      profileStatus.textContent = role === 'admin' ? (lang === 'fr' ? 'Admin' : 'Admin') : (lang === 'fr' ? 'Membre' : 'Member');
+
+      if (profile?.accountActivated || profile?.discordVerified) {
+        accountRoleBadge.textContent = `${accountRoleBadge.textContent} • ${lang === 'fr' ? 'Activé' : 'Activated'}`;
+        accountRoleBadge.classList.add('account-badge-success');
+        activationStatus.textContent = lang === 'fr' ? 'Compte activé' : 'Account activated';
+      } else {
+        accountRoleBadge.classList.remove('account-badge-success');
+        activationStatus.textContent = lang === 'fr' ? 'Activation requise' : 'Activation required';
+      }
+
+      const joined = profile?.joined ? formatDate(profile.joined) : '';
+      document.getElementById('accountSince').textContent = joined
+        ? `${lang === 'fr' ? 'Membre depuis' : 'Member since'} ${joined}`
+        : '';
+
+      // Historique de téléchargements
+      const historyList = document.getElementById('accountHistoryList');
+      const history = await getUserDownloadHistory(user.uid).catch(() => []);
+      if (history.length === 0) {
+        historyList.innerHTML = `<div class="account-history-empty">${historyEmpty[lang] || historyEmpty.fr}</div>`;
+      } else {
+        historyList.innerHTML = history.map(h => `
+          <a class="account-history-item" href="index.html?id=${encodeURIComponent(h.modId)}">
+            <i class="fa fa-download"></i>
+            <span class="account-history-title">${h.modTitle || h.modId}</span>
+            <span class="account-history-date">${formatDate(h.downloadedAt)}</span>
+          </a>
+        `).join('');
+      }
+
+      loadingEl?.classList.add('hidden');
+      contentEl?.classList.remove('hidden');
+    });
+
+    document.getElementById('accountLogoutBtn')?.addEventListener('click', async () => {
+      await logoutUser();
+      window.location.href = 'index.html';
+    });
+  </script>
+
+</body>
+</html>

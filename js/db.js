@@ -328,6 +328,8 @@ export async function registerUser(email, password, name, steamId = null) {
       name: name || email.split('@')[0],
       steamId: steamId || null,
       discordVerified: false,
+      accountActivated: false,
+      activationState: "pending",
       role: "member",
       joined: serverTimestamp()
     });
@@ -346,6 +348,24 @@ export async function loginUser(email, password) {
   } catch (err) {
     console.error("loginUser:", err);
     throw err;
+  }
+}
+
+/** Vérifie si le compte a bien été activé via Discord */
+export async function getUserActivationStatus(uid) {
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    if (!snap.exists()) return { accountActivated: false, discordVerified: false, activationState: "pending" };
+    const data = snap.data();
+    return {
+      accountActivated: Boolean(data.accountActivated),
+      discordVerified: Boolean(data.discordVerified),
+      activationState: data.activationState || (data.accountActivated ? "activated" : "pending"),
+      discordInvite: data.discordInvite || null
+    };
+  } catch (err) {
+    console.error("getUserActivationStatus:", err);
+    return { accountActivated: false, discordVerified: false, activationState: "pending" };
   }
 }
 
@@ -391,6 +411,34 @@ export async function updateUserProfile(docId, data) {
   } catch (err) { console.error("updateUserProfile:", err); }
 }
 
+/** Enregistre un téléchargement dans l'historique de l'utilisateur connecté.
+    Ne fait rien si personne n'est connecté (téléchargement anonyme). */
+export async function recordUserDownload(modId, modTitle) {
+  try {
+    const user = auth.currentUser;
+    if (!user) return;
+    await addDoc(collection(db, "users", user.uid, "downloads"), {
+      modId: String(modId),
+      modTitle: modTitle || '',
+      downloadedAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.error("recordUserDownload:", err);
+  }
+}
+
+/** Récupère l'historique de téléchargements d'un utilisateur, du plus récent au plus ancien */
+export async function getUserDownloadHistory(uid) {
+  try {
+    const q = query(collection(db, "users", uid, "downloads"), orderBy("downloadedAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.error("getUserDownloadHistory:", err);
+    return [];
+  }
+}
+
 // ---- Export objet DB (compatibilité avec script.js existant) ----
 // ---- Export objet DB (compatibilité avec script.js existant) ----
 export const DB = {
@@ -415,6 +463,8 @@ export const DB = {
   getUserProfile,
   linkSteamIdToCurrentUser,
   updateUserProfile,
+  recordUserDownload,
+  getUserDownloadHistory,
   watchSubmissionStatus: listenSubmissionStatus
 };
 

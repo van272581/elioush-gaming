@@ -14,7 +14,9 @@ import DB, {
   loginUser,
   registerUser,
   logoutUser,
-  onUserStateChange
+  onUserStateChange,
+  getUserProfile,
+  recordUserDownload
 } from "./js/db.js";
 
 // ===================================================
@@ -57,6 +59,18 @@ const i18n = {
     'upload.title': '📤 Soumettre un Mod',
     'contact.title': 'Nous contacter',
     'contact.sub': 'Une question, un mod à proposer, un bug à signaler ? Écrivez-nous directement.',
+    'nav.account': 'Mon compte',
+    'account.title': 'Mon espace membre',
+    'account.memberSince': 'Membre depuis',
+    'account.role.member': 'Membre',
+    'account.role.admin': 'Administrateur',
+    'account.steamLinked': 'Compte Steam lié',
+    'account.steamNotLinked': 'Aucun compte Steam lié',
+    'account.logout': 'Se déconnecter',
+    'account.historyTitle': 'Historique de téléchargements',
+    'account.historyEmpty': 'Vous n\'avez encore téléchargé aucun mod.',
+    'account.loading': 'Chargement de votre profil...',
+    'account.notLoggedIn': 'Vous devez être connecté pour voir cette page. Redirection...',
   },
   en: {
     'nav.all': 'All', 'nav.vehicles': 'Vehicles', 'nav.paints': 'Paints',
@@ -94,41 +108,90 @@ const i18n = {
     'upload.title': '📤 Submit a Mod',
     'contact.title': 'Contact us',
     'contact.sub': 'A question, a mod to suggest, a bug to report? Write to us directly.',
+    'nav.account': 'My account',
+    'account.title': 'My member area',
+    'account.memberSince': 'Member since',
+    'account.role.member': 'Member',
+    'account.role.admin': 'Administrator',
+    'account.steamLinked': 'Linked Steam account',
+    'account.steamNotLinked': 'No Steam account linked',
+    'account.logout': 'Log out',
+    'account.historyTitle': 'Download history',
+    'account.historyEmpty': 'You haven\'t downloaded any mods yet.',
+    'account.loading': 'Loading your profile...',
+    'account.notLoggedIn': 'You must be logged in to view this page. Redirecting...',
   }
 };
 
-let currentLang = localStorage.getItem('eg_lang') || 'fr';
-let loginMode = 'login';
+const SUPPORTED_LANGS = ['fr', 'en'];
 
-function t(key) { return (i18n[currentLang] || i18n.fr)[key] || key; }
+function getPreferredLanguage() {
+  const browserLang = (navigator.language || '').toLowerCase();
+  return browserLang.startsWith('en') ? 'en' : 'fr';
+}
+
+let currentLang = getPreferredLanguage();
+let loginMode = 'login';
+const DISCORD_INVITE_URL = 'https://discord.gg/dR2VF7mYt7';
+
+function t(key, fallbackLang = currentLang) {
+  const langPack = i18n[fallbackLang] || i18n.fr || {};
+  return langPack[key] || i18n.fr[key] || key;
+}
+
+function showDiscordActivationMessage(type = 'required') {
+  const status = document.getElementById('loginStatus');
+  if (!status) return;
+  status.style.display = 'block';
+
+  if (type === 'success') {
+    status.className = 'login-status success';
+    status.textContent = currentLang === 'fr'
+      ? '✅ Votre compte est activé. Vous pouvez maintenant utiliser votre accès membre.'
+      : '✅ Your account is activated. You can now use your member access.';
+    return;
+  }
+
+  if (type === 'ineligible') {
+    status.className = 'login-status error';
+    status.textContent = currentLang === 'fr'
+      ? '❌ Vous n’êtes pas éligible à l’activation de votre compte. Rejoignez le serveur Discord pour valider votre accès.'
+      : '❌ You are not eligible to activate your account. Join the Discord server to validate your access.';
+    return;
+  }
+
+  status.className = 'login-status info';
+  status.textContent = currentLang === 'fr'
+    ? '🔗 Rejoignez le serveur Discord pour activer votre compte. Une fois membre, revenez ici pour terminer la validation.'
+    : '🔗 Join the Discord server to activate your account. Once a member, come back here to complete the validation.';
+}
 
 function applyTranslations() {
+  const langPack = i18n[currentLang] || i18n.fr || {};
+
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (i18n[currentLang][key]) el.innerHTML = i18n[currentLang][key];
+    const translation = langPack[key] || i18n.fr[key] || key;
+
+    if (translation && /<[a-z][\s\S]*>/i.test(translation)) {
+      el.innerHTML = translation;
+    } else if (translation) {
+      el.textContent = translation;
+    }
   });
+
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
-    if (i18n[currentLang][key]) el.placeholder = i18n[currentLang][key];
+    const translation = langPack[key] || i18n.fr[key] || '';
+    if (translation) el.placeholder = translation;
   });
-  document.querySelectorAll('.lang-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.lang === currentLang);
-  });
+
   document.documentElement.lang = currentLang;
+  document.documentElement.dataset.lang = currentLang;
 }
 
 // Language switch buttons
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.lang-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      currentLang = btn.dataset.lang;
-      localStorage.setItem('eg_lang', currentLang);
-      applyTranslations();
-      // Re-render showcase if on index
-      if (typeof updateShowcase === 'function') updateShowcase();
-      if (typeof updateLoginMode === 'function') updateLoginMode(loginMode);
-    });
-  });
   applyTranslations();
   const loginTitle = document.querySelector('.login-title');
   const tabLogin = document.getElementById('tabLogin');
@@ -180,6 +243,37 @@ if (toggleEl) {
 autoTheme();
 
 // ===================================================
+// SESSION UTILISATEUR — reconnexion automatique + reflet dans le menu
+// Firebase Auth conserve la session localement d'une visite à l'autre ;
+// ce bloc se charge simplement d'en tenir compte partout dans l'interface,
+// ce qui manquait complètement auparavant (l'utilisateur "disparaissait"
+// visuellement après inscription/connexion même si son compte existait bien).
+// ===================================================
+let currentUser = null;
+let currentUserProfile = null;
+
+function updateAuthUI() {
+  document.querySelectorAll('.login-btn').forEach(btn => {
+    if (currentUser) {
+      btn.removeAttribute('data-i18n');
+      const label = currentUserProfile?.name || currentUser.email?.split('@')[0] || t('nav.account');
+      btn.textContent = `👤 ${label}`;
+      btn.onclick = () => transitionTo('account.html');
+    } else {
+      btn.setAttribute('data-i18n', 'nav.login');
+      btn.textContent = t('nav.login');
+      btn.onclick = () => transitionTo('login.html');
+    }
+  });
+}
+
+onUserStateChange(async (user) => {
+  currentUser = user;
+  currentUserProfile = user ? await getUserProfile(user.uid).catch(() => null) : null;
+  updateAuthUI();
+});
+
+// ===================================================
 // HAMBURGER
 // ===================================================
 const hamburger = document.getElementById("hamburger");
@@ -223,6 +317,11 @@ function initETSBackground() {
   const canvas = document.createElement('canvas');
   canvas.id = 'ets-bg-canvas';
   document.body.prepend(canvas);
+
+  // Respecte la préférence système "mouvement réduit" : on n'anime pas le
+  // décor pour les personnes qui l'ont demandé, le fond reste simplement neutre.
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (prefersReducedMotion) return;
 
   const ctx = canvas.getContext('2d');
   let animationFrameId;
@@ -683,6 +782,18 @@ function initETSBackground() {
     animationFrameId = requestAnimationFrame(animate);
   }
 
+  // Coupe l'animation dès que l'onglet n'est plus visible (économie batterie/CPU),
+  // et la relance proprement au retour, sans jamais gêner la navigation.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    } else if (!animationFrameId) {
+      lastTime = 0;
+      animationFrameId = requestAnimationFrame(animate);
+    }
+  });
+
   // Start the background loop
   animationFrameId = requestAnimationFrame(animate);
 }
@@ -798,6 +909,7 @@ async function renderShowcase(mod) {
         const counter = document.getElementById(`dlCounter_${id}`);
         if (counter) counter.textContent = n;
       } catch (e) { /* fallback silent */ }
+      recordUserDownload(id, mod.title); // Historique du membre connecté (silencieux si non connecté)
       setTimeout(() => {
         btn.classList.remove('animating');
         window.open(url, '_blank');
@@ -826,10 +938,26 @@ function renderPagination() {
     <button class="pg-arrow" id="pgNext" ${currentPage === total - 1 ? 'disabled' : ''}>&#8594;</button>
   `;
 
-  document.getElementById('pgPrev')?.addEventListener('click', () => { if (currentPage > 0) { currentPage--; updateShowcase(); } });
-  document.getElementById('pgNext')?.addEventListener('click', () => { if (currentPage < filteredMods.length - 1) { currentPage++; updateShowcase(); } });
+  document.getElementById('pgPrev')?.addEventListener('click', () => {
+    if (currentPage > 0) {
+      currentPage--;
+      updateShowcase();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
+  document.getElementById('pgNext')?.addEventListener('click', () => {
+    if (currentPage < filteredMods.length - 1) {
+      currentPage++;
+      updateShowcase();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  });
   paginationBar.querySelectorAll('.pg-wheel').forEach(w => {
-    w.addEventListener('click', () => { currentPage = parseInt(w.dataset.idx); updateShowcase(); });
+    w.addEventListener('click', () => {
+      currentPage = parseInt(w.dataset.idx);
+      updateShowcase();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   });
 }
 
@@ -1287,6 +1415,16 @@ Elioush Gaming Bot`
 const loginForm = document.getElementById("loginForm");
 
 if (loginForm) {
+  const activationParam = new URLSearchParams(window.location.search).get('activation');
+  const pendingActivation = localStorage.getItem('eg_account_activation_pending') === '1';
+
+  if (activationParam === 'discord-joined' || pendingActivation) {
+    localStorage.removeItem('eg_account_activation_pending');
+    showDiscordActivationMessage('success');
+  } else if (activationParam === 'not-eligible') {
+    showDiscordActivationMessage('ineligible');
+  }
+
   loginForm.addEventListener("submit", async e => {
     e.preventDefault();
     const email = document.getElementById("loginEmail")?.value.trim();
@@ -1316,8 +1454,8 @@ if (loginForm) {
         if (status) {
           status.className = 'login-status success';
           status.textContent = currentLang === 'fr'
-            ? '✅ Compte créé avec succès ! Redirection...'
-            : '✅ Account created successfully! Redirecting...';
+            ? '✅ Compte créé avec succès !' 
+            : '✅ Account created successfully!';
         }
       } else {
         const user = await DB.loginUser(email, password);
@@ -1328,12 +1466,16 @@ if (loginForm) {
         if (status) {
           status.className = 'login-status success';
           status.textContent = currentLang === 'fr'
-            ? '✅ Connexion réussie ! Redirection...'
-            : '✅ Login successful! Redirecting...';
+            ? '✅ Connexion réussie !' 
+            : '✅ Login successful!';
         }
       }
 
-      setTimeout(() => transitionTo('index.html'), 1200);
+      showDiscordActivationMessage('required');
+      localStorage.setItem('eg_account_activation_pending', '1');
+      setTimeout(() => {
+        window.open(DISCORD_INVITE_URL, '_blank', 'noopener,noreferrer');
+      }, 400);
     } catch (error) {
       if (status) {
         status.className = 'login-status error';
@@ -1345,14 +1487,8 @@ if (loginForm) {
   // Discord button — check join then verify
   document.getElementById("discordBtn")?.addEventListener("click", e => {
     e.preventDefault();
-    window.open("https://discord.gg/CM7JNnd3Uc", "_blank");
-    const status = document.getElementById("loginStatus");
-    if (status) {
-      status.style.display = 'block';
-      status.className = 'login-status info';
-      status.innerHTML = currentLang === 'fr'
-        ? '🔗 Rejoignez le serveur Discord puis revenez ici. Une fois membre, votre accès sera activé.'
-        : '🔗 Join the Discord server then come back. Once a member, your access will be activated.';
-    }
+    localStorage.setItem('eg_account_activation_pending', '1');
+    window.open(DISCORD_INVITE_URL, '_blank', 'noopener,noreferrer');
+    showDiscordActivationMessage('required');
   });
 }
