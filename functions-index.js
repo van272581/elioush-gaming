@@ -2,10 +2,110 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const OpenID = require('openid'); // Pour valider la réponse OpenID Steam
 const axios = require('axios'); // Pour interroger l'API Web de Steam
+const crypto = require('crypto');
 
 // Initialise l'Admin SDK de Firebase
 admin.initializeApp();
 const db = admin.firestore(); // Initialise Firestore
+
+const DISCORD_COMMUNITY = Object.freeze({
+    guildId: '1384877980215541810',
+    playerRoleId: '1389207663279345725',
+    managerRoleId: '1389214534358794300',
+    clientId: '1546124600214032535'
+});
+const DISCORD_OAUTH_REDIRECT = 'https://us-central1-elioush-gaming.cloudfunctions.net/discordOAuthCallback';
+const SITE_LOGIN_URL = 'https://van272581.github.io/elioush-gaming/login.html';
+
+function isAdminContext(context) {
+    return context.auth?.token?.admin === true;
+}
+
+function getDiscordConfig() {
+    return {
+        clientSecret: functions.config().discord?.client_secret || '',
+        redirectUri: DISCORD_OAUTH_REDIRECT
+    };
+}
+
+function normalizeModerationAction(action) {
+    const value = String(action || '').trim().toLowerCase();
+    if (['approuvé', 'approuve', 'approved'].includes(value)) return 'approved';
+    if (['refusé', 'refuse', 'refused'].includes(value)) return 'refused';
+    if (value.startsWith('a revoir') || value.startsWith('à revoir') || value.startsWith('review')) return 'review';
+    return null;
+}
+
+async function moderateSubmission(submissionId, action, statusMsg, adminUid) {
+    const status = normalizeModerationAction(action);
+    if (!status) throw new Error('Unknown moderation action.');
+
+    const submissionRef = db.collection('submissions').doc(submissionId);
+    let submission;
+
+    await db.runTransaction(async transaction => {
+        const snapshot = await transaction.get(submissionRef);
+        if (!snapshot.exists) throw new Error('Submission not found.');
+        submission = snapshot.data();
+
+        if (submission.status !== 'pending') {
+            throw new Error('Submission has already been processed.');
+        }
+
+        if (status === 'approved') {
+            const links = [];
+            if (submission.dl1Link) links.push({ type: submission.dl1Type || 'mediafire', label: submission.dl1Type || 'MediaFire', url: submission.dl1Link });
+            if (submission.dl2Link) links.push({ type: submission.dl2Type || 'autre', label: submission.dl2Type || 'Autre', url: submission.dl2Link });
+
+            const modRef = db.collection('mods').doc();
+            transaction.create(modRef, {
+                submissionId,
+                authorUid: submission.uid || null,
+                title: submission.title,
+                cat: submission.cat,
+                desc: submission.desc,
+                images: submission.images || [],
+                links,
+                author: submission.author,
+                version: submission.version,
+                status: 'approved',
+                downloads: 0,
+                date: new Date().toISOString().split('T')[0],
+                createdAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        transaction.update(submissionRef, {
+            status,
+            statusMsg: statusMsg || status,
+            processedBy: adminUid || 'webhook',
+            processedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        const auditRef = db.collection('auditLogs').doc();
+        transaction.set(auditRef, {
+            action: `submission_${status}`,
+            submissionId,
+            adminUid: adminUid || 'webhook',
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+    });
+
+    if (submission.uid && status === 'approved') {
+        const userRecord = await admin.auth().getUser(submission.uid);
+        await admin.auth().setCustomUserClaims(submission.uid, {
+            ...userRecord.customClaims,
+            creator: true
+        });
+        await db.collection('users').doc(submission.uid).set({
+            role: userRecord.customClaims?.admin === true ? 'admin' : 'creator',
+            creatorVerified: true,
+            creatorVerifiedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+    }
+
+    return { ...submission, status, statusMsg: statusMsg || status };
+}
 
 // Configurez le "Relying Party" pour OpenID
 // ⚠️ IMPORTANT : cette URL doit CORRESPONDRE EXACTEMENT à SITE_BASE_URL + '/login.html'
@@ -187,6 +287,268 @@ exports.steamAuth = functions.https.onCall(async (data, context) => {
     return { token: customToken };
 });
 
+// Génère une URL OAuth Discord liée au compte Firebase actuellement connecté.
+exports.createDiscordOAuthUrl = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Connexion au site requise.');
+    }
+
+    const { clientSecret, redirectUri } = getDiscordConfig();
+    if (!clientSecret) {
+        throw new functions.https.HttpsError('failed-precondition', 'Client Secret Discord non configure.');
+    }
+
+    const state = crypto.randomBytes(32).toString('hex');
+    await db.collection('discordOAuthStates').doc(state).set({
+        uid: context.auth.uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 10 * 60 * 1000)
+    });
+
+    const params = new URLSearchParams({
+        client_id: DISCORD_COMMUNITY.clientId,
+        response_type: 'code',
+        redirect_uri: redirectUri,
+        scope: 'identify guilds.members.read',
+        state,
+        prompt: 'consent'
+    });
+    return { url: `https://discord.com/oauth2/authorize?${params.toString()}` };
+});
+
+// Callback OAuth : vérifie l'appartenance au serveur et les rôles Discord.
+exports.discordOAuthCallback = functions.https.onRequest(async (req, res) => {
+    const code = String(req.query.code || '').trim();
+    const state = String(req.query.state || '').trim();
+    if (!code || !state) return res.redirect(`${SITE_LOGIN_URL}?discord=invalid`);
+
+    try {
+        const stateRef = db.collection('discordOAuthStates').doc(state);
+        const stateSnapshot = await stateRef.get();
+        if (!stateSnapshot.exists) return res.redirect(`${SITE_LOGIN_URL}?discord=expired`);
+        const stateData = stateSnapshot.data();
+        await stateRef.delete();
+        if (!stateData.expiresAt || stateData.expiresAt.toMillis() < Date.now()) {
+            return res.redirect(`${SITE_LOGIN_URL}?discord=expired`);
+        }
+
+        const { clientSecret, redirectUri } = getDiscordConfig();
+        if (!clientSecret) return res.redirect(`${SITE_LOGIN_URL}?discord=not_configured`);
+
+        const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
+            client_id: DISCORD_COMMUNITY.clientId,
+            client_secret: clientSecret,
+            grant_type: 'authorization_code',
+            code,
+            redirect_uri: redirectUri
+        }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+        const accessToken = tokenResponse.data.access_token;
+        const discordHeaders = { Authorization: `Bearer ${accessToken}` };
+        const [profileResponse, memberResponse] = await Promise.all([
+            axios.get('https://discord.com/api/users/@me', { headers: discordHeaders }),
+            axios.get(`https://discord.com/api/users/@me/guilds/${DISCORD_COMMUNITY.guildId}/member`, { headers: discordHeaders })
+        ]);
+
+        const discordUser = profileResponse.data;
+        const roleIds = memberResponse.data?.roles || [];
+        const communityRole = roleIds.includes(DISCORD_COMMUNITY.managerRoleId)
+            ? 'manager'
+            : (roleIds.includes(DISCORD_COMMUNITY.playerRoleId) ? 'player' : 'member');
+        const userRecord = await admin.auth().getUser(stateData.uid);
+        await admin.auth().setCustomUserClaims(stateData.uid, {
+            ...userRecord.customClaims,
+            discordVerified: true,
+            communityRole
+        });
+        await db.collection('users').doc(stateData.uid).set({
+            discordUserId: discordUser.id,
+            discordUsername: discordUser.global_name || discordUser.username,
+            discordVerified: true,
+            communityRole,
+            role: communityRole === 'manager' ? 'manager' : (communityRole === 'player' ? 'player' : 'member'),
+            discordVerifiedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+
+        return res.redirect(`${SITE_LOGIN_URL}?discord=verified&communityRole=${communityRole}`);
+    } catch (error) {
+        console.error('discordOAuthCallback:', error.response?.data || error.message);
+        return res.redirect(`${SITE_LOGIN_URL}?discord=not_member`);
+    }
+});
+
+// Modération depuis un tableau de bord authentifié.
+exports.moderateSubmission = functions.https.onCall(async (data, context) => {
+    if (!isAdminContext(context)) {
+        throw new functions.https.HttpsError('permission-denied', 'Accès administrateur requis.');
+    }
+
+    const submissionId = String(data?.submissionId || '').trim();
+    const action = data?.action;
+    const statusMsg = String(data?.statusMsg || '').trim();
+    if (!submissionId || !normalizeModerationAction(action)) {
+        throw new functions.https.HttpsError('invalid-argument', 'Soumission ou action invalide.');
+    }
+
+    try {
+        return await moderateSubmission(submissionId, action, statusMsg, context.auth.uid);
+    } catch (error) {
+        console.error('moderateSubmission:', error);
+        throw new functions.https.HttpsError('failed-precondition', error.message);
+    }
+});
+
+// Vérifie ou retire le statut créateur depuis un compte administrateur.
+exports.verifyCreator = functions.https.onCall(async (data, context) => {
+    if (!isAdminContext(context)) {
+        throw new functions.https.HttpsError('permission-denied', 'Accès administrateur requis.');
+    }
+
+    const uid = String(data?.uid || '').trim();
+    const verified = data?.verified === true;
+    if (!uid) throw new functions.https.HttpsError('invalid-argument', 'UID utilisateur requis.');
+
+    try {
+        const userRecord = await admin.auth().getUser(uid);
+        const claims = { ...userRecord.customClaims, creator: verified };
+        await admin.auth().setCustomUserClaims(uid, claims);
+        await db.collection('users').doc(uid).set({
+            role: claims.admin === true ? 'admin' : (verified ? 'creator' : 'member'),
+            creatorVerified: verified,
+            creatorVerifiedAt: verified ? admin.firestore.FieldValue.serverTimestamp() : null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        return { uid, verified };
+    } catch (error) {
+        console.error('verifyCreator:', error);
+        throw new functions.https.HttpsError('internal', 'Impossible de mettre à jour le créateur.');
+    }
+});
+
+// Comptabilise un téléchargement sans autoriser le navigateur à modifier un mod.
+exports.registerDownload = functions.https.onCall(async (data, context) => {
+    if (!context.auth) {
+        throw new functions.https.HttpsError('unauthenticated', 'Connexion requise pour télécharger.');
+    }
+    const modId = String(data?.modId || '').trim();
+    const requestedTitle = String(data?.modTitle || '').trim();
+    if (!modId) {
+        throw new functions.https.HttpsError('invalid-argument', 'Identifiant du mod requis.');
+    }
+
+    const modRef = db.collection('mods').doc(modId);
+    const statsRef = db.collection('downloadStats').doc(modId);
+    const downloadRef = context.auth
+        ? db.collection('users').doc(context.auth.uid).collection('downloads').doc()
+        : null;
+
+    try {
+        let downloadCount = 0;
+        await db.runTransaction(async transaction => {
+            const modSnapshot = await transaction.get(modRef);
+            if (!modSnapshot.exists || modSnapshot.data().status !== 'approved') {
+                if (downloadRef && requestedTitle) {
+                    const statsSnapshot = await transaction.get(statsRef);
+                    downloadCount = (statsSnapshot.exists ? statsSnapshot.data().downloads || 0 : 0) + 1;
+                    transaction.set(statsRef, {
+                        modId,
+                        title: requestedTitle,
+                        downloads: downloadCount,
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    transaction.set(downloadRef, {
+                        modId,
+                        modTitle: requestedTitle,
+                        source: String(data?.source || 'external-link').slice(0, 40),
+                        downloadedAt: admin.firestore.FieldValue.serverTimestamp()
+                    });
+                    return;
+                }
+                throw new functions.https.HttpsError('not-found', 'Mod indisponible.');
+            }
+
+            transaction.update(modRef, {
+                downloads: admin.firestore.FieldValue.increment(1),
+                lastDownloadedAt: admin.firestore.FieldValue.serverTimestamp()
+            });
+
+            if (downloadRef) {
+                transaction.set(downloadRef, {
+                    modId,
+                    modTitle: requestedTitle || modSnapshot.data().title || '',
+                    downloadedAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+            }
+        });
+
+        if (downloadCount > 0) return { downloads: downloadCount };
+        const updated = await modRef.get();
+        return { downloads: updated.data()?.downloads || 0 };
+    } catch (error) {
+        if (error instanceof functions.https.HttpsError) throw error;
+        console.error('registerDownload:', error);
+        throw new functions.https.HttpsError('internal', 'Téléchargement non enregistré.');
+    }
+});
+
+// Publie une annonce Discord validee dans la categorie Divers.
+exports.discordCommunityWebhook = functions.https.onRequest(async (req, res) => {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method not allowed.' });
+    }
+
+    const webhookSecret = functions.config().discord?.webhook_secret || null;
+    const suppliedSecret = req.get('x-discord-webhook-secret');
+    if (!webhookSecret || suppliedSecret !== webhookSecret) {
+        return res.status(403).json({ error: 'Unauthorized webhook.' });
+    }
+
+    const payload = req.body || {};
+    const content = String(payload.content || payload.message || '').trim();
+    const embeds = Array.isArray(payload.embeds) ? payload.embeds : [];
+    const attachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+    const imageUrls = [
+        ...embeds.map(embed => embed.image?.url || embed.thumbnail?.url),
+        ...attachments.map(attachment => attachment.url)
+    ].filter(url => /^https?:\/\//i.test(String(url || ''))).slice(0, 4);
+
+    if (!content && imageUrls.length === 0) {
+        return res.status(400).json({ error: 'Empty community post.' });
+    }
+
+    try {
+        const ref = await db.collection('mods').add({
+            title: String(payload.title || 'Actualite communautaire Elioush Gaming').slice(0, 120),
+            cat: 'divers',
+            desc: content.slice(0, 5000),
+            images: imageUrls,
+            links: [{ type: 'autre', label: 'Discord', url: 'https://discord.gg/tWKmrx3mBQ' }],
+            author: String(payload.author || 'Elioush Gaming').slice(0, 80),
+            version: 'Communautaire',
+            status: 'approved',
+            downloads: 0,
+            community: {
+                eventStatus: String(payload.eventStatus || 'Information communautaire').slice(0, 120),
+                statusTone: ['live', 'pending', 'closed', 'info'].includes(payload.statusTone) ? payload.statusTone : 'info',
+                playersOnline: Number.isFinite(Number(payload.playersOnline)) ? Math.max(0, Number(payload.playersOnline)) : 0,
+                playersTarget: Number.isFinite(Number(payload.playersTarget)) ? Math.max(0, Number(payload.playersTarget)) : 0,
+                convoyOrder: Array.isArray(payload.convoyOrder) ? payload.convoyOrder.map(item => String(item).slice(0, 160)).slice(0, 12) : [],
+                eventLink: /^https?:\/\//i.test(payload.eventLink || '') ? payload.eventLink : '',
+                eventLinkLabel: String(payload.eventLinkLabel || "Voir l'evenement").slice(0, 80),
+                profileLink: /^https?:\/\//i.test(payload.profileLink || '') ? payload.profileLink : '',
+                profileInstruction: String(payload.profileInstruction || '').slice(0, 1200)
+            },
+            date: new Date().toISOString().split('T')[0],
+            source: 'discord-webhook',
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        return res.status(201).json({ success: true, id: ref.id });
+    } catch (error) {
+        console.error('discordCommunityWebhook:', error);
+        return res.status(500).json({ error: 'Community post could not be published.' });
+    }
+});
+
 // --- Endpoint admin pour traiter les commandes d'approbation depuis un webhook ou service e-mail ---
 exports.processAdminCommand = functions.https.onRequest(async (req, res) => {
     if (req.method !== 'POST') {
@@ -194,14 +556,14 @@ exports.processAdminCommand = functions.https.onRequest(async (req, res) => {
     }
 
     const adminSecret = functions.config().admin?.webhook_secret || null;
-    const secret = req.body?.secret || req.query?.secret || null;
+    const suppliedSecret = req.get('x-admin-webhook-secret');
 
-    if (adminSecret && secret !== adminSecret) {
+    if (!adminSecret || !suppliedSecret || suppliedSecret !== adminSecret) {
         return res.status(403).json({ error: 'Unauthorized. Invalid secret.' });
     }
 
-    const email = (req.body?.email || req.query?.email || '').trim().toLowerCase();
-    const action = (req.body?.action || req.query?.action || '').trim().toLowerCase();
+    const email = (req.body?.email || '').trim().toLowerCase();
+    const action = (req.body?.action || '').trim().toLowerCase();
     const message = req.body?.message || req.body?.statusMsg || '';
 
     if (!email || !action) {
@@ -223,43 +585,8 @@ exports.processAdminCommand = functions.https.onRequest(async (req, res) => {
         const docRef = snap.docs[0].ref;
         const sub = snap.docs[0].data();
 
-        let status = 'pending';
-        let statusMsg = message || '';
-
-        if (action === 'approuvé' || action === 'approuve' || action === 'approved') {
-            status = 'approved';
-            statusMsg = statusMsg || 'approved';
-            const linksList = [];
-            if (sub.dl1Link) linksList.push({ type: sub.dl1Type || 'mediafire', label: sub.dl1Type || 'MediaFire', url: sub.dl1Link });
-            if (sub.dl2Link) linksList.push({ type: sub.dl2Type || 'autre', label: sub.dl2Type || 'Autre', url: sub.dl2Link });
-
-            await db.collection('mods').add({
-                title: sub.title,
-                cat: sub.cat,
-                desc: sub.desc,
-                images: sub.images || [],
-                links: linksList,
-                author: sub.author,
-                version: sub.version,
-                status: 'approved',
-                downloads: 0,
-                date: new Date().toISOString().split('T')[0],
-                createdAt: admin.firestore.FieldValue.serverTimestamp()
-            });
-
-        } else if (action === 'refusé' || action === 'refuse' || action === 'refused') {
-            status = 'refused';
-            statusMsg = statusMsg || 'refused';
-        } else if (action.startsWith('a revoir') || action.startsWith('à revoir') || action.startsWith('review')) {
-            status = 'review';
-            statusMsg = statusMsg || action;
-        } else {
-            return res.status(400).json({ error: 'Unknown action. Use approuvé, refusé or à revoir.' });
-        }
-
-        await docRef.update({ status, statusMsg, processedAt: admin.firestore.FieldValue.serverTimestamp() });
-
-        return res.status(200).json({ success: true, status, statusMsg });
+        const result = await moderateSubmission(docRef.id, action, message, 'webhook');
+        return res.status(200).json({ success: true, status: result.status, statusMsg: result.statusMsg });
     } catch (error) {
         console.error('processAdminCommand:', error);
         return res.status(500).json({ error: error.message || 'Internal server error.' });

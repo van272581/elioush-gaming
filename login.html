@@ -13,7 +13,7 @@
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -95,6 +95,12 @@
             <i class="fa fa-search"></i>
           </button>
           <div id="searchDropdown" class="search-dropdown"></div>
+        </div>
+
+        <div class="lang-switch">
+          <button class="lang-btn active" data-lang="fr">FR</button>
+          <span class="lang-sep">|</span>
+          <button class="lang-btn" data-lang="en">EN</button>
         </div>
 
         <div class="theme-toggle">
@@ -264,6 +270,16 @@
         <span data-i18n="login.or">OU</span>
       </div>
 
+      <button type="button" class="google-btn" id="googleLoginBtn">
+        <i class="fa-brands fa-google"></i>
+        <span>Continuer avec Google</span>
+      </button>
+
+      <button type="button" class="discord-btn" id="discordVerifyBtn">
+        <i class="fa-brands fa-discord"></i>
+        <span>Vérifier mes rôles Discord</span>
+      </button>
+
       <a
         href="#"
         class="steam-btn"
@@ -288,7 +304,7 @@
       </p>
 
       <a
-        href="https://discord.gg/dR2VF7mYt7"
+        href="https://discord.gg/CM7JNnd3Uc"
         target="_blank"
         class="discord-btn"
         id="discordBtn">

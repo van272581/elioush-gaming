@@ -1,0 +1,23 @@
+{
+  "functions": {
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "node_modules",
+      "node_modules/**",
+      "public",
+      "assets",
+      "components",
+      "js",
+      "*.html",
+      "*.css",
+      "firebase-config.js",
+      "script.js"
+    ]
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

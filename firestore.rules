@@ -1,0 +1,73 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.role == 'member';
+      allow update: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['name', 'steamId', 'updatedAt']));
+      allow delete: if isAdmin();
+
+      match /downloads/{downloadId} {
+        allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+        allow create: if false;
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.title is string
+        && request.resource.data.author is string
+        && request.resource.data.email is string
+        && request.resource.data.cat is string
+        && request.resource.data.version is string
+        && request.resource.data.desc is string
+        && request.resource.data.images is list
+        && request.resource.data.dl1Link is string;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /mods/{modId} {
+      allow read: if resource.data.status == 'approved' || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /downloadStats/{modId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /comments/{commentId} {
+      allow read: if true;
+      allow create: if request.resource.data.modId is string
+        && request.resource.data.author is string
+        && request.resource.data.body is string;
+      allow update, delete: if isAdmin();
+    }
+
+    match /auditLogs/{logId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "elioush-gaming-functions",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^5.1.1",
+    "openid": "^2.0.18"
+  }
+}

@@ -13,7 +13,7 @@
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -46,6 +46,12 @@
           <div id="searchDropdown" class="search-dropdown"></div>
         </div>
 
+        <div class="lang-switch">
+          <button class="lang-btn active" data-lang="fr">FR</button>
+          <span class="lang-sep">|</span>
+          <button class="lang-btn" data-lang="en">EN</button>
+        </div>
+
         <div class="theme-toggle">
           <input type="checkbox" id="themeToggle">
           <label for="themeToggle" class="toggle-label">
@@ -73,45 +79,31 @@
 
     <div id="accountContent" class="account-content hidden">
       <section class="account-card">
-        <div class="account-card-top">
-          <div class="account-avatar" id="accountAvatar">?</div>
-          <div class="account-meta">
-            <span class="account-eyebrow">MEMBER AREA</span>
-            <h1 class="account-name" id="accountName">—</h1>
-            <p class="account-email" id="accountEmail">—</p>
-          </div>
-        </div>
+        <div class="account-avatar" id="accountAvatar">?</div>
+        <h1 class="account-name" id="accountName">—</h1>
+        <p class="account-email" id="accountEmail">—</p>
 
         <div class="account-badges">
           <span class="account-badge" id="accountRoleBadge">—</span>
           <span class="account-badge account-badge-muted" id="accountSince">—</span>
         </div>
 
-        <div class="account-summary-grid">
-          <div class="account-info-card">
-            <span class="account-card-label">Activation</span>
-            <strong id="accountActivationStatus">En attente</strong>
-          </div>
-          <div class="account-info-card">
-            <span class="account-card-label">Profil</span>
-            <strong id="accountProfileStatus">Membre</strong>
-          </div>
+        <div class="account-steam-row" id="accountSteamRow">
+          <i class="fa-brands fa-steam-symbol"></i>
+          <span id="accountSteamText" data-i18n="account.steamNotLinked">Aucun compte Steam lié</span>
         </div>
 
-        <div class="account-status-panel">
-          <i class="fa-solid fa-shield-check"></i>
-          <span>Votre accès membre est validé selon votre statut Discord et votre profil.</span>
-        </div>
-
-        <div class="account-actions">
-          <a href="index.html" class="account-cta secondary">Retour au catalogue</a>
-          <button class="account-logout-btn" id="accountLogoutBtn" data-i18n="account.logout">Se déconnecter</button>
-        </div>
+        <button class="account-logout-btn" id="accountLogoutBtn" data-i18n="account.logout">Se déconnecter</button>
       </section>
 
       <section class="account-history">
         <h2 data-i18n="account.historyTitle">Historique de téléchargements</h2>
         <div id="accountHistoryList" class="account-history-list"></div>
+      </section>
+
+      <section class="account-history hidden" id="accountSubmissionsSection">
+        <h2 data-i18n="account.submissionsTitle">Mes soumissions</h2>
+        <div id="accountSubmissionsList" class="account-history-list"></div>
       </section>
     </div>
   </main>
@@ -126,13 +118,19 @@
   <script type="module" src="./script.js"></script>
 
   <script type="module">
-    import { onUserStateChange, getUserProfile, getUserDownloadHistory, logoutUser } from './js/db.js';
+    import { onUserStateChange, getUserProfile, getUserDownloadHistory, listenUserSubmissions, logoutUser } from './js/db.js';
 
-    const lang = (navigator.language || '').toLowerCase().startsWith('en') ? 'en' : 'fr';
+    const lang = localStorage.getItem('eg_lang') || 'fr';
     const roleLabels = {
-      fr: { member: 'Membre', admin: 'Administrateur' },
-      en: { member: 'Member', admin: 'Administrator' }
+      fr: { member: 'Membre', admin: 'Administrateur', creator: 'Créateur vérifié' },
+      en: { member: 'Member', admin: 'Administrator', creator: 'Verified creator' }
     };
+    const statusLabels = {
+      fr: { pending: 'En attente', approved: 'Validé', refused: 'Refusé', review: 'À revoir' },
+      en: { pending: 'Pending', approved: 'Approved', refused: 'Refused', review: 'Needs changes' }
+    };
+    const statusColors = { pending: '#f5a623', approved: '#00a651', refused: '#e53935', review: '#f5a623' };
+    const submissionsEmpty = { fr: 'Vous n\'avez encore proposé aucun mod.', en: 'You haven\'t submitted any mods yet.' };
     const steamLabel = {
       fr: id => `Compte Steam lié : ${id}`,
       en: id => `Linked Steam account: ${id}`
@@ -147,9 +145,13 @@
       } catch { return ''; }
     }
 
+    let unsubscribeSubmissions = null;
+
     onUserStateChange(async (user) => {
       const loadingEl = document.getElementById('accountLoading');
       const contentEl = document.getElementById('accountContent');
+
+      if (unsubscribeSubmissions) { unsubscribeSubmissions(); unsubscribeSubmissions = null; }
 
       if (!user) {
         if (loadingEl) loadingEl.textContent = notLoggedIn[lang] || notLoggedIn.fr;
@@ -158,33 +160,29 @@
       }
 
       const profile = await getUserProfile(user.uid).catch(() => null);
-      const name = profile?.name || user.email?.split('@')[0] || '—';
+      const name = profile?.name || profile?.displayName || user.email?.split('@')[0] || '—';
 
       document.getElementById('accountAvatar').textContent = name.charAt(0).toUpperCase();
       document.getElementById('accountName').textContent = name;
       document.getElementById('accountEmail').textContent = user.email || '';
 
-      const role = profile?.role === 'admin' ? 'admin' : 'member';
-      const accountRoleBadge = document.getElementById('accountRoleBadge');
-      const activationStatus = document.getElementById('accountActivationStatus');
-      const profileStatus = document.getElementById('accountProfileStatus');
-
-      accountRoleBadge.textContent = (roleLabels[lang] || roleLabels.fr)[role];
-      profileStatus.textContent = role === 'admin' ? (lang === 'fr' ? 'Admin' : 'Admin') : (lang === 'fr' ? 'Membre' : 'Member');
-
-      if (profile?.accountActivated || profile?.discordVerified) {
-        accountRoleBadge.textContent = `${accountRoleBadge.textContent} • ${lang === 'fr' ? 'Activé' : 'Activated'}`;
-        accountRoleBadge.classList.add('account-badge-success');
-        activationStatus.textContent = lang === 'fr' ? 'Compte activé' : 'Account activated';
-      } else {
-        accountRoleBadge.classList.remove('account-badge-success');
-        activationStatus.textContent = lang === 'fr' ? 'Activation requise' : 'Activation required';
-      }
+      const role = profile?.role === 'admin' ? 'admin' : (profile?.role === 'creator' ? 'creator' : 'member');
+      document.getElementById('accountRoleBadge').textContent = (roleLabels[lang] || roleLabels.fr)[role];
 
       const joined = profile?.joined ? formatDate(profile.joined) : '';
       document.getElementById('accountSince').textContent = joined
         ? `${lang === 'fr' ? 'Membre depuis' : 'Member since'} ${joined}`
         : '';
+
+      const steamRow = document.getElementById('accountSteamRow');
+      const steamText = document.getElementById('accountSteamText');
+      if (profile?.steamId) {
+        steamText.textContent = (steamLabel[lang] || steamLabel.fr)(profile.steamId);
+        steamRow.classList.add('linked');
+      } else {
+        steamText.textContent = lang === 'fr' ? 'Aucun compte Steam lié' : 'No Steam account linked';
+        steamRow.classList.remove('linked');
+      }
 
       // Historique de téléchargements
       const historyList = document.getElementById('accountHistoryList');
@@ -196,10 +194,40 @@
           <a class="account-history-item" href="index.html?id=${encodeURIComponent(h.modId)}">
             <i class="fa fa-download"></i>
             <span class="account-history-title">${h.modTitle || h.modId}</span>
+            <span class="account-history-count">${h.downloadCount} téléchargement${h.downloadCount > 1 ? 's' : ''}</span>
             <span class="account-history-date">${formatDate(h.downloadedAt)}</span>
           </a>
         `).join('');
       }
+
+      // Mes soumissions (créateur) — visible dès qu'il existe au moins une soumission liée au compte,
+      // même si le rôle "creator" n'est pas encore confirmé (ex : première soumission avant liaison Steam).
+      const submissionsSection = document.getElementById('accountSubmissionsSection');
+      const submissionsList = document.getElementById('accountSubmissionsList');
+      unsubscribeSubmissions = listenUserSubmissions(user.uid, (subs) => {
+        if (role !== 'creator' && subs.length === 0) {
+          submissionsSection.classList.add('hidden');
+          return;
+        }
+        submissionsSection.classList.remove('hidden');
+        if (subs.length === 0) {
+          submissionsList.innerHTML = `<div class="account-history-empty">${submissionsEmpty[lang] || submissionsEmpty.fr}</div>`;
+          return;
+        }
+        submissionsList.innerHTML = subs.map(s => {
+          const status = s.status || 'pending';
+          const label = (statusLabels[lang] || statusLabels.fr)[status] || status;
+          const color = statusColors[status] || '#999';
+          return `
+            <div class="account-history-item account-submission-item">
+              <i class="fa fa-file-arrow-up"></i>
+              <span class="account-history-title">${s.title || '—'}</span>
+              <span class="account-submission-status" style="color:${color};border-color:${color}">${label}</span>
+              <span class="account-history-date">${formatDate(s.submittedAt)}</span>
+            </div>
+          `;
+        }).join('');
+      });
 
       loadingEl?.classList.add('hidden');
       contentEl?.classList.remove('hidden');

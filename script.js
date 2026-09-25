@@ -10,14 +10,16 @@ import DB, {
   addPendingSubmission,
   getSubmissionStatus,
   listenSubmissionStatus,
-  processAdminKeyword,
   loginUser,
   registerUser,
+  loginWithGoogle,
+  createDiscordOAuthUrl,
+  sendPasswordReset,
   logoutUser,
   onUserStateChange,
   getUserProfile,
-  recordUserDownload
 } from "./js/db.js";
+import { auth } from "./firebase-config.js";
 
 // ===================================================
 // i18n — Translations
@@ -55,6 +57,7 @@ const i18n = {
     'status.refused': '❌ Votre mod a été <strong>refusé</strong>. Contactez l\'admin pour plus d\'informations.',
     'status.review': '🔄 Votre mod nécessite des modifications : ',
     'pub.date': 'Publié le', 'pub.author': 'Auteur',
+    'description.more': 'Voir plus', 'description.less': 'Voir moins',
     'pg.of': 'sur',
     'upload.title': '📤 Soumettre un Mod',
     'contact.title': 'Nous contacter',
@@ -69,6 +72,7 @@ const i18n = {
     'account.logout': 'Se déconnecter',
     'account.historyTitle': 'Historique de téléchargements',
     'account.historyEmpty': 'Vous n\'avez encore téléchargé aucun mod.',
+    'account.submissionsTitle': 'Mes soumissions',
     'account.loading': 'Chargement de votre profil...',
     'account.notLoggedIn': 'Vous devez être connecté pour voir cette page. Redirection...',
   },
@@ -104,6 +108,7 @@ const i18n = {
     'status.refused': '❌ Your mod was <strong>refused</strong>. Contact admin for more info.',
     'status.review': '🔄 Your mod needs changes: ',
     'pub.date': 'Published', 'pub.author': 'Author',
+    'description.more': 'Read more', 'description.less': 'Show less',
     'pg.of': 'of',
     'upload.title': '📤 Submit a Mod',
     'contact.title': 'Contact us',
@@ -118,80 +123,50 @@ const i18n = {
     'account.logout': 'Log out',
     'account.historyTitle': 'Download history',
     'account.historyEmpty': 'You haven\'t downloaded any mods yet.',
+    'account.submissionsTitle': 'My submissions',
     'account.loading': 'Loading your profile...',
     'account.notLoggedIn': 'You must be logged in to view this page. Redirecting...',
   }
 };
 
-const SUPPORTED_LANGS = ['fr', 'en'];
-
-function getPreferredLanguage() {
-  const browserLang = (navigator.language || '').toLowerCase();
-  return browserLang.startsWith('en') ? 'en' : 'fr';
-}
-
-let currentLang = getPreferredLanguage();
+let currentLang = localStorage.getItem('eg_lang') || 'fr';
 let loginMode = 'login';
-const DISCORD_INVITE_URL = 'https://discord.gg/dR2VF7mYt7';
 
-function t(key, fallbackLang = currentLang) {
-  const langPack = i18n[fallbackLang] || i18n.fr || {};
-  return langPack[key] || i18n.fr[key] || key;
+function getPendingDownload() {
+  try { return JSON.parse(localStorage.getItem('eg_pending_download') || 'null'); }
+  catch { localStorage.removeItem('eg_pending_download'); return null; }
 }
 
-function showDiscordActivationMessage(type = 'required') {
-  const status = document.getElementById('loginStatus');
-  if (!status) return;
-  status.style.display = 'block';
-
-  if (type === 'success') {
-    status.className = 'login-status success';
-    status.textContent = currentLang === 'fr'
-      ? '✅ Votre compte est activé. Vous pouvez maintenant utiliser votre accès membre.'
-      : '✅ Your account is activated. You can now use your member access.';
-    return;
-  }
-
-  if (type === 'ineligible') {
-    status.className = 'login-status error';
-    status.textContent = currentLang === 'fr'
-      ? '❌ Vous n’êtes pas éligible à l’activation de votre compte. Rejoignez le serveur Discord pour valider votre accès.'
-      : '❌ You are not eligible to activate your account. Join the Discord server to validate your access.';
-    return;
-  }
-
-  status.className = 'login-status info';
-  status.textContent = currentLang === 'fr'
-    ? '🔗 Rejoignez le serveur Discord pour activer votre compte. Une fois membre, revenez ici pour terminer la validation.'
-    : '🔗 Join the Discord server to activate your account. Once a member, come back here to complete the validation.';
-}
+function t(key) { return (i18n[currentLang] || i18n.fr)[key] || key; }
 
 function applyTranslations() {
-  const langPack = i18n[currentLang] || i18n.fr || {};
-
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    const translation = langPack[key] || i18n.fr[key] || key;
-
-    if (translation && /<[a-z][\s\S]*>/i.test(translation)) {
-      el.innerHTML = translation;
-    } else if (translation) {
-      el.textContent = translation;
-    }
+    if (i18n[currentLang][key]) el.innerHTML = i18n[currentLang][key];
   });
-
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
-    const translation = langPack[key] || i18n.fr[key] || '';
-    if (translation) el.placeholder = translation;
+    if (i18n[currentLang][key]) el.placeholder = i18n[currentLang][key];
   });
-
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === currentLang);
+  });
   document.documentElement.lang = currentLang;
-  document.documentElement.dataset.lang = currentLang;
 }
 
 // Language switch buttons
 document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentLang = btn.dataset.lang;
+      localStorage.setItem('eg_lang', currentLang);
+      applyTranslations();
+      // Re-render showcase if on index
+      if (typeof updateShowcase === 'function') updateShowcase();
+      if (typeof updateLoginMode === 'function') updateLoginMode(loginMode);
+      updateAuthUI();
+    });
+  });
   applyTranslations();
   const loginTitle = document.querySelector('.login-title');
   const tabLogin = document.getElementById('tabLogin');
@@ -271,6 +246,12 @@ onUserStateChange(async (user) => {
   currentUser = user;
   currentUserProfile = user ? await getUserProfile(user.uid).catch(() => null) : null;
   updateAuthUI();
+  const canUpload = ['player', 'manager', 'creator', 'admin'].includes(currentUserProfile?.communityRole)
+    || ['creator', 'admin'].includes(currentUserProfile?.role);
+  document.querySelectorAll('.upload-btn').forEach(button => {
+    button.hidden = !canUpload;
+    button.setAttribute('aria-hidden', String(!canUpload));
+  });
 });
 
 // ===================================================
@@ -846,15 +827,35 @@ const commentsSection = document.getElementById("commentsSection");
 
 let filteredMods = [];
 let currentPage = 0;
+let allModsCache = [];
+let activeCategory = 'tous';
+let activeKeyword = '';
 
 async function getAllMods() {
-  if (typeof DB !== 'undefined') return await DB.getApprovedMods();
+  if (allModsCache.length > 0) return allModsCache;
+  if (typeof DB !== 'undefined') {
+    allModsCache = await DB.getApprovedMods();
+    return allModsCache;
+  }
   if (typeof SEED_MODS !== 'undefined') return SEED_MODS;
   return [];
 }
 
+function applyModFilter(all, cat, keyword) {
+  activeCategory = cat || 'tous';
+  activeKeyword = keyword || '';
+  const normalizedKeyword = activeKeyword.toLowerCase();
+  filteredMods = all.filter(mod => {
+    const matchCat = activeCategory === 'tous' || activeCategory === 'all' || mod.cat === activeCategory;
+    const matchKeyword = !normalizedKeyword || mod.title.toLowerCase().includes(normalizedKeyword);
+    return matchCat && matchKeyword;
+  });
+  currentPage = Math.min(currentPage, Math.max(filteredMods.length - 1, 0));
+  updateShowcase();
+}
+
 function getTypeIcon(type) {
-  const m = { mediafire: 'fa-fire', sharemods: 'fa-share-alt', routesync: 'fa-rotate', autre: 'fa-download' };
+  const m = { mediafire: 'fa-fire', sharemods: 'fa-share-alt', routesync: 'fa-rotate', discord: 'fa-discord', workshop: 'fa-steam', autre: 'fa-arrow-up-right-from-square' };
   return `<i class="fa ${m[type] || m.autre}"></i>`;
 }
 
@@ -870,32 +871,88 @@ async function renderShowcase(mod) {
     img.addEventListener('click', () => openLightbox(img.src));
   });
 
-  // Download buttons
+  const isCommunity = mod.cat === 'divers' && mod.community;
+
+  // Download or community redirection buttons
   const links = (mod.links || []).slice(0, 2);
   const dlBtnsHtml = links.map((lnk, i) => {
     const cls = i === 0 ? 'dl-btn dl-btn-primary' : 'dl-btn dl-btn-secondary';
-    const label = lnk.type === 'routesync' ? t('dl.routesync') : t('dl.mediafire');
+    const label = lnk.label || (lnk.type === 'routesync' ? t('dl.routesync') : t('dl.mediafire'));
+    if (isCommunity) {
+      return `<a class="${cls} community-link" href="${lnk.url}" target="_blank" rel="noopener noreferrer">
+        ${getTypeIcon(lnk.type)} <span>${label}</span>
+      </a>`;
+    }
     return `<button class="${cls}" data-url="${lnk.url}" data-mod-id="${mod.id}">
       <span class="btn-label">${getTypeIcon(lnk.type)} ${label}</span>
       <span class="truck-anim"><span class="truck-icon">🚛</span><span class="truck-progress"></span></span>
     </button>`;
   }).join('');
 
-  const dlCount = typeof DB !== 'undefined' ? await DB.getDownloads(mod.id) : 0;
+  const dlCount = isCommunity ? null : (typeof DB !== 'undefined' ? await DB.getDownloads(mod.id) : 0);
   const pubDate = mod.date ? `<span class="pub-date"><i class="fa fa-calendar"></i> ${t('pub.date')} ${mod.date}</span>` : '';
   const author = mod.author ? `<span class="pub-date"><i class="fa fa-user"></i> ${t('pub.author')} : ${mod.author}</span>` : '';
+  const workshopStats = mod.workshopSubscribers != null
+    ? `<span class="pub-date workshop-stats"><i class="fa-brands fa-steam"></i> ${mod.workshopSubscribers} abonnés Steam</span>`
+    : '';
+  const community = mod.community || {};
+  const communityPanel = isCommunity ? `
+    <section class="community-panel" aria-label="Informations du convoi">
+      <div class="community-status ${community.statusTone || 'info'}">
+        <i class="fa fa-tower-broadcast" aria-hidden="true"></i>
+        <span>${community.eventStatus || 'Statut non renseigne'}</span>
+      </div>
+      <div class="community-stats">
+        <span><i class="fa fa-users" aria-hidden="true"></i> ${community.playersOnline ?? 0}/${community.playersTarget ?? 0} joueurs</span>
+        <span><i class="fa fa-clock" aria-hidden="true"></i> Mise a jour en temps reel</span>
+      </div>
+      <div class="convoy-order">
+        <h3>Ordre des mods du convoi</h3>
+        <ol>${(community.convoyOrder || []).map(item => `<li>${item}</li>`).join('')}</ol>
+      </div>
+      <p class="profile-instruction"><i class="fa fa-circle-info" aria-hidden="true"></i> ${community.profileInstruction || ''}</p>
+      <div class="community-actions">
+        ${community.eventLink ? `<a class="dl-btn dl-btn-secondary community-link" href="${community.eventLink}" target="_blank" rel="noopener noreferrer"><i class="fa fa-calendar-check"></i> ${community.eventLinkLabel || 'Voir l evenement'}</a>` : ''}
+        ${community.profileLink ? `<a class="dl-btn dl-btn-primary community-link" href="${community.profileLink}" target="_blank" rel="noopener noreferrer"><i class="fa fa-file-zipper"></i> Profil convoi (.rar)</a>` : ''}
+      </div>
+    </section>` : '';
 
   showcaseInfo.innerHTML = `
     <div class="showcase-meta">
       <span class="cat-badge">${mod.cat}</span>
-      <span class="dl-count"><i class="fa fa-download"></i> <span id="dlCounter_${mod.id}">${dlCount}</span></span>
+      ${isCommunity ? '' : `<span class="dl-count"><i class="fa fa-download"></i> <span id="dlCounter_${mod.id}">${dlCount}</span></span>`}
       ${pubDate}
       ${author}
+      ${workshopStats}
     </div>
+    ${communityPanel}
     <h2 class="showcase-title">${mod.title}</h2>
-    <p class="showcase-desc">${mod.desc}</p>
-    <div class="download-buttons">${dlBtnsHtml}</div>
+    <div class="showcase-desc-wrap">
+      <p class="showcase-desc" id="showcaseDescription">${mod.desc}</p>
+      <button class="description-toggle" type="button" aria-expanded="false" aria-controls="showcaseDescription">
+        <span class="description-toggle-label">${t('description.more')}</span>
+        <i class="fa fa-chevron-down" aria-hidden="true"></i>
+      </button>
+    </div>
+    ${dlBtnsHtml ? `<div class="download-buttons">${dlBtnsHtml}</div>` : ''}
   `;
+
+  const description = showcaseInfo.querySelector('.showcase-desc');
+  const descriptionToggle = showcaseInfo.querySelector('.description-toggle');
+  if (description && descriptionToggle && description.textContent.trim().length < 260) {
+    descriptionToggle.hidden = true;
+    description.classList.add('is-expanded');
+  }
+  descriptionToggle?.addEventListener('click', () => {
+    const expanded = descriptionToggle.getAttribute('aria-expanded') === 'true';
+    description?.classList.toggle('is-expanded', !expanded);
+    descriptionToggle.setAttribute('aria-expanded', String(!expanded));
+    descriptionToggle.querySelector('.description-toggle-label').textContent = t(
+      expanded ? 'description.more' : 'description.less'
+    );
+    descriptionToggle.querySelector('i').classList.toggle('fa-chevron-up', !expanded);
+    descriptionToggle.querySelector('i').classList.toggle('fa-chevron-down', expanded);
+  });
 
   // Truck animation on click
   showcaseInfo.querySelectorAll('.dl-btn[data-url]').forEach(btn => {
@@ -903,13 +960,21 @@ async function renderShowcase(mod) {
       const url = btn.getAttribute('data-url');
       const id = btn.getAttribute('data-mod-id');
       if (url === '#' || !url) return;
+      if (!auth.currentUser) {
+        localStorage.setItem('eg_pending_download', JSON.stringify({
+          url,
+          modId: id,
+          returnUrl: `${window.location.pathname}${window.location.search}`
+        }));
+        window.location.href = `login.html?return=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        return;
+      }
       btn.classList.add('animating');
       try {
-        const n = await incrementDownload(id);
+        const n = await incrementDownload(id, mod.title, btn.querySelector('.btn-label')?.textContent || 'external-link');
         const counter = document.getElementById(`dlCounter_${id}`);
         if (counter) counter.textContent = n;
       } catch (e) { /* fallback silent */ }
-      recordUserDownload(id, mod.title); // Historique du membre connecté (silencieux si non connecté)
       setTimeout(() => {
         btn.classList.remove('animating');
         window.open(url, '_blank');
@@ -976,14 +1041,7 @@ async function updateShowcase() {
 
 async function filterMods(cat, keyword) {
   const all = await getAllMods();
-  filteredMods = all.filter(m => {
-    const matchCat = cat === 'tous' || cat === 'all' || m.cat === cat;
-    const kw = (keyword || '').toLowerCase();
-    const matchKw = !kw || m.title.toLowerCase().includes(kw);
-    return matchCat && matchKw;
-  });
-  currentPage = 0;
-  updateShowcase();
+  applyModFilter(all, cat, keyword);
 }
 
 // Search
@@ -1042,6 +1100,22 @@ if (showcaseImages) {
   const initCat = urlParams.get('cat') || 'tous';
   const initQuery = urlParams.get('q') || '';
   const initId = urlParams.get('id');
+
+  if (typeof listenApprovedMods === 'function') {
+    listenApprovedMods(mods => {
+      allModsCache = mods;
+      if (initId) {
+        const target = allModsCache.find(mod => String(mod.id) === String(initId));
+        if (target) {
+          filteredMods = allModsCache.filter(mod => mod.cat === target.cat);
+          currentPage = Math.max(filteredMods.findIndex(mod => String(mod.id) === String(initId)), 0);
+          updateShowcase();
+        }
+      } else {
+        applyModFilter(allModsCache, activeCategory, activeKeyword);
+      }
+    });
+  }
 
   if (searchInput && initQuery) {
     searchInput.value = initQuery;
@@ -1166,8 +1240,8 @@ async function renderComments(modId) {
 // ===================================================
 // STATUS POLLING — Check mod submission status
 // ===================================================
-async function checkModStatus(email, sub) {
-  if (!sub && typeof DB !== 'undefined') sub = await DB.getSubmissionStatus(email);
+async function checkModStatus(uid, sub) {
+  if (!sub && typeof DB !== 'undefined') sub = await DB.getSubmissionStatus(uid);
   if (!sub) return;
   const statusEl = document.getElementById('submissionStatus');
   if (!statusEl) return;
@@ -1187,25 +1261,6 @@ async function checkModStatus(email, sub) {
   }
   statusEl.style.display = 'block';
 }
-
-// Admin keyword simulation —
-// In production this would be triggered by a webhook from the email/WhatsApp gateway.
-// For now: the admin opens the URL: ?admin_action=approuvé&email=user@email.com
-(async function checkAdminAction() {
-  const params = new URLSearchParams(window.location.search);
-  const action = params.get('admin_action');
-  const email = params.get('email');
-  if (action && email && typeof DB !== 'undefined') {
-    const result = await DB.processAdminKeyword(action, email);
-    if (result) {
-      // Remove params from URL
-      window.history.replaceState({}, '', window.location.pathname);
-      if (result.status === 'approved') {
-        alert(`✅ Mod "${result.title}" approuvé et publié automatiquement !`);
-      }
-    }
-  }
-})();
 
 // ===================================================
 // UPLOAD FORM (upload.html)
@@ -1285,6 +1340,18 @@ if (uploadForm) {
 
     if (!valid) return;
 
+    if (!currentUser) {
+      const formMessage = document.getElementById("formMessage");
+      if (formMessage) {
+        formMessage.style.display = "block";
+        formMessage.className = "form-message error";
+        formMessage.textContent = currentLang === 'fr'
+          ? "Connectez-vous pour envoyer une proposition."
+          : "Sign in before submitting a mod.";
+      }
+      return;
+    }
+
     // Gather values
     const title = document.getElementById("modTitle").value.trim();
     const author = document.getElementById("modAuthor").value.trim();
@@ -1300,7 +1367,7 @@ if (uploadForm) {
     const date = new Date().toLocaleDateString("fr-FR");
 
     // Save as pending submission in DB
-    const submissionData = { title, author, email, cat, version, desc, images, dl1Type, dl1Link, dl2Type, dl2Link };
+    const submissionData = { title, author, email, cat, version, desc, images, dl1Type, dl1Link, dl2Type, dl2Link, uid: currentUser?.uid || null };
     if (typeof DB !== 'undefined') await DB.addPendingSubmission(submissionData);
 
     // CSV content
@@ -1373,8 +1440,8 @@ Elioush Gaming Bot`
       `;
       // Real-time status listener via Firebase (or polling fallback)
       if (typeof DB !== 'undefined') {
-        DB.listenSubmissionStatus(email, (sub) => {
-          checkModStatus(email, sub);
+        DB.listenSubmissionStatus(currentUser.uid, (sub) => {
+          checkModStatus(currentUser.uid, sub);
           if (sub.status === 'approved') {
             if (typeof filterMods === 'function') filterMods('tous', '');
           }
@@ -1415,15 +1482,41 @@ Elioush Gaming Bot`
 const loginForm = document.getElementById("loginForm");
 
 if (loginForm) {
-  const activationParam = new URLSearchParams(window.location.search).get('activation');
-  const pendingActivation = localStorage.getItem('eg_account_activation_pending') === '1';
-
-  if (activationParam === 'discord-joined' || pendingActivation) {
-    localStorage.removeItem('eg_account_activation_pending');
-    showDiscordActivationMessage('success');
-  } else if (activationParam === 'not-eligible') {
-    showDiscordActivationMessage('ineligible');
-  }
+  document.querySelector('.forgot-link')?.addEventListener('click', async event => {
+    event.preventDefault();
+    const emailInput = document.getElementById('loginEmail');
+    const status = document.getElementById('loginStatus');
+    const email = emailInput?.value.trim();
+    if (!email) {
+      emailInput?.focus();
+      if (status) {
+        status.style.display = 'block';
+        status.className = 'login-status error';
+        status.textContent = currentLang === 'fr'
+          ? 'Renseignez votre adresse e-mail avant de demander la réinitialisation.'
+          : 'Enter your email before requesting a password reset.';
+      }
+      return;
+    }
+    try {
+      await sendPasswordReset(email);
+      if (status) {
+        status.style.display = 'block';
+        status.className = 'login-status success';
+        status.textContent = currentLang === 'fr'
+          ? 'Un lien de réinitialisation a été envoyé à cette adresse.'
+          : 'A password reset link was sent to this address.';
+      }
+    } catch (error) {
+      if (status) {
+        status.style.display = 'block';
+        status.className = 'login-status error';
+        status.textContent = currentLang === 'fr'
+          ? 'Impossible d’envoyer le lien. Vérifiez l’adresse et la configuration Firebase.'
+          : 'Unable to send the reset link. Check the address and Firebase configuration.';
+      }
+    }
+  });
 
   loginForm.addEventListener("submit", async e => {
     e.preventDefault();
@@ -1454,8 +1547,8 @@ if (loginForm) {
         if (status) {
           status.className = 'login-status success';
           status.textContent = currentLang === 'fr'
-            ? '✅ Compte créé avec succès !' 
-            : '✅ Account created successfully!';
+            ? '✅ Compte créé avec succès ! Redirection...'
+            : '✅ Account created successfully! Redirecting...';
         }
       } else {
         const user = await DB.loginUser(email, password);
@@ -1466,16 +1559,16 @@ if (loginForm) {
         if (status) {
           status.className = 'login-status success';
           status.textContent = currentLang === 'fr'
-            ? '✅ Connexion réussie !' 
-            : '✅ Login successful!';
+            ? '✅ Connexion réussie ! Redirection...'
+            : '✅ Login successful! Redirecting...';
         }
       }
 
-      showDiscordActivationMessage('required');
-      localStorage.setItem('eg_account_activation_pending', '1');
-      setTimeout(() => {
-        window.open(DISCORD_INVITE_URL, '_blank', 'noopener,noreferrer');
-      }, 400);
+      const returnUrl = new URLSearchParams(window.location.search).get('return')
+        || getPendingDownload()?.returnUrl
+        || 'index.html';
+      localStorage.removeItem('eg_pending_download');
+      setTimeout(() => transitionTo(returnUrl), 1200);
     } catch (error) {
       if (status) {
         status.className = 'login-status error';
@@ -1487,8 +1580,55 @@ if (loginForm) {
   // Discord button — check join then verify
   document.getElementById("discordBtn")?.addEventListener("click", e => {
     e.preventDefault();
-    localStorage.setItem('eg_account_activation_pending', '1');
-    window.open(DISCORD_INVITE_URL, '_blank', 'noopener,noreferrer');
-    showDiscordActivationMessage('required');
+    window.open("https://discord.gg/CM7JNnd3Uc", "_blank");
+    const status = document.getElementById("loginStatus");
+    if (status) {
+      status.style.display = 'block';
+      status.className = 'login-status info';
+      status.innerHTML = currentLang === 'fr'
+        ? '🔗 Rejoignez le serveur Discord puis revenez ici. Une fois membre, votre accès sera activé.'
+        : '🔗 Join the Discord server then come back. Once a member, your access will be activated.';
+    }
+  });
+
+  document.getElementById('discordVerifyBtn')?.addEventListener('click', async () => {
+    const status = document.getElementById('loginStatus');
+    try {
+      if (status) {
+        status.style.display = 'block';
+        status.className = 'login-status info';
+        status.textContent = 'Ouverture de la verification Discord...';
+      }
+      window.location.href = await createDiscordOAuthUrl();
+    } catch (error) {
+      if (status) {
+        status.style.display = 'block';
+        status.className = 'login-status error';
+        status.textContent = 'Connectez-vous avant de verifier votre compte Discord.';
+      }
+    }
+  });
+
+  document.getElementById('googleLoginBtn')?.addEventListener('click', async () => {
+    const status = document.getElementById('loginStatus');
+    try {
+      if (status) {
+        status.style.display = 'block';
+        status.className = 'login-status info';
+        status.textContent = currentLang === 'fr' ? 'Connexion Google...' : 'Signing in with Google...';
+      }
+      await loginWithGoogle();
+      const returnUrl = new URLSearchParams(window.location.search).get('return')
+        || getPendingDownload()?.returnUrl
+        || 'index.html';
+      localStorage.removeItem('eg_pending_download');
+      setTimeout(() => transitionTo(returnUrl), 500);
+    } catch (error) {
+      if (status) {
+        status.style.display = 'block';
+        status.className = 'login-status error';
+        status.textContent = currentLang === 'fr' ? 'Connexion Google impossible.' : 'Google sign-in failed.';
+      }
+    }
   });
 }
