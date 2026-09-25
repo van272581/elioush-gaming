@@ -46,6 +46,17 @@ La migration devra etre executee cote serveur avec :
 
 Les mots de passe Firebase ne sont pas exportables en clair. Les utilisateurs devront utiliser la reinitialisation de mot de passe Supabase, ou se reconnecter via Google/Discord.
 
+Commande de migration, a executer uniquement depuis un environnement de confiance :
+
+```powershell
+$env:SUPABASE_URL="https://votre-projet.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="CLE_PRIVEE_SUPABASE"
+$env:FIREBASE_SERVICE_ACCOUNT_JSON=(Get-Content .\firebase-service-account.json -Raw)
+npm run migrate:supabase
+```
+
+Le fichier `firebase-service-account.json` ne doit jamais etre committe. Le script est relancable : ses identifiants deterministes evitent les doublons. Il cree les comptes Supabase Auth par email sans mot de passe, puis les utilisateurs doivent utiliser la reinitialisation de mot de passe.
+
 ## Bascule
 
 1. Executer le schema.

@@ -23,6 +23,7 @@ create table if not exists public.profiles (
 
 create table if not exists public.mods (
   id uuid primary key default gen_random_uuid(),
+  legacy_id text unique,
   author_id uuid references public.profiles(id) on delete set null,
   title text not null,
   category text not null check (category in ('vehicules', 'peintures', 'cartes', 'divers')),
