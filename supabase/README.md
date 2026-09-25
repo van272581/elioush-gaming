@@ -16,10 +16,14 @@ Firebase reste le backend actif pendant la migration. Le fichier `schema.sql` pr
 
 Elles pourront etre placees dans la configuration frontend apres creation du projet :
 
+La configuration publique actuelle est dans `supabase-config.js` :
+
 ```text
-SUPABASE_URL=https://votre-projet.supabase.co
-SUPABASE_ANON_KEY=votre-cle-anon
+SUPABASE_URL=https://llbvjbiytsgofeyvbscx.supabase.co
+SUPABASE_ANON_KEY=cle publishable/anon
 ```
+
+Cette configuration n'est pas encore utilisee par le frontend principal : Firebase reste actif pendant la migration.
 
 La cle `anon` peut apparaitre dans le frontend uniquement avec RLS activee.
 
