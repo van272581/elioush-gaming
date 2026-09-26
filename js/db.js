@@ -26,10 +26,10 @@ export const SEED_MODS = [
     cat: "peintures",
     desc: "Pack de Peintures Ivoiriennes pour Bus G8 1200 6x2 de Fabio Contier\n\nCaractéristiques :\n• Livrées inspirées des principales compagnies ivoiriennes de transport\n• Plusieurs peintures fidèlement reproduites\n• Compatible avec le bus G8 1200 6x2 de Fabio Contier\n• Apporte davantage de réalisme et d'immersion\n\nPeintures incluses :\n• SBTA\n• UTB 40 Ans\n• UTB Exclusive\n• UTB Executive\n• ESIF\n• TSR\n• Océan Transport\n• Khalil Transport\n• Léopard Transport\n\nInstallation :\n• Téléchargez le fichier du mod\n• Placez le fichier .scs dans : Documents\\Euro Truck Simulator 2\\mod\n• Lancez Euro Truck Simulator 2\n• Activez le mod dans le Gestionnaire de mods\n• Achetez ou modifiez votre bus G8 1200 6x2 de Fabio Contier puis sélectionnez la peinture souhaitée\n\nConseil de placement :\n• Placez ce mod au-dessus du mod principal du bus pour éviter les conflits\n\nPriorité recommandée :\n↑ Pack Peintures Ivoiriennes G8 1200 6x2\n↑ Mod du Bus G8 1200 6x2 Fabio Contier\n↓ Autres mods\n\nAuteur : VANO",
     images: [
-      "./assets/UTB Exclu front.jpg",
+      "./assets/UTB_Exclu_front.jpg",
       "./assets/SBTA3.jpg",
       "./assets/ETV side.png",
-      "./assets/Ocean Trans front.jpg"
+      "./assets/Ocean_Trans_front.jpg"
     ],
     links: [{ type: "mediafire", label: "MediaFire", url: "https://rekonise.com/3fcmodskinsg8scania6x2-wea59" }],
     author: "Elioush", version: "1.50.x", status: "approved",
@@ -124,7 +124,7 @@ export const SEED_MODS = [
     title: "Elioush Gaming - Convois et actualites Discord",
     cat: "divers",
     desc: "Retrouvez les activites du serveur Elioush Gaming : annonces de convois, photos partagees par la communaute, rendez-vous evenementiels et informations importantes.\n\nCette rubrique est reservee a la vie du groupe : aucune archive de mod n'est telechargee ici. Les liens servent uniquement a rejoindre Discord, consulter l'evenement ou obtenir le profil de convoi.",
-    images: ["./assets/traffic_pack.png"],
+    images: ["./assets/flyer.jpg"],
     links: [{ type: "discord", label: "Rejoindre Discord", url: "https://discord.gg/tWKmrx3mBQ", external: true }],
     community: {
       eventStatus: "Convoi en preparation",
