@@ -267,6 +267,14 @@ img { display: block; max-width: 100%; }
   margin-top: 20px;
   scroll-margin-top: 90px; /* évite que le header sticky ne masque le titre au clic sur "Contact" */
 }
+/* Masquée par défaut : elle ne doit pas apparaître dans les autres onglets
+   que l'utilisateur ouvre sur la page d'accueil (Tous, Véhicules, Peintures, Maps, Divers). */
+.contact-section-page[hidden] { display: none; }
+.contact-section-page.is-revealing { animation: contactReveal 0.45s ease both; }
+@keyframes contactReveal {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
 .contact-container {
   max-width: 720px;
   margin: 0 auto;

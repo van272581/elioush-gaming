@@ -1094,6 +1094,45 @@ async function renderSearchPreview(keyword) {
   });
 }
 
+// ===================================================
+// CONTACT — visible uniquement au clic sur le bouton "Contact" de la nav
+// ===================================================
+const contactSection = document.getElementById("contact");
+const navContactBtn = document.getElementById("navContactBtn");
+
+/** Affiche la section Contact puis défile jusqu'à elle (transition + scroll lissés). */
+function showContactSection() {
+  if (!contactSection) return;
+  contactSection.hidden = false;
+  // Relance l'animation d'apparition à chaque ouverture.
+  contactSection.classList.remove('is-revealing');
+  void contactSection.offsetWidth;
+  contactSection.classList.add('is-revealing');
+  contactSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+/** Masque la section Contact (retour à l'affichage normal des mods). */
+function hideContactSection() {
+  if (!contactSection) return;
+  contactSection.classList.remove('is-revealing');
+  contactSection.hidden = true;
+}
+
+navContactBtn?.addEventListener('click', () => {
+  if (contactSection?.hidden) {
+    showContactSection();
+  } else {
+    hideContactSection();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+});
+
+// Les autres pages (account, login, upload) pointent vers index.html#contact :
+// on révèle alors la section à l'arrivée, après la transition de page.
+if (window.location.hash === '#contact') {
+  window.addEventListener('load', () => setTimeout(showContactSection, 600));
+}
+
 // Init showcase on index.html
 if (showcaseImages) {
   const urlParams = new URLSearchParams(window.location.search);
@@ -1126,6 +1165,7 @@ if (showcaseImages) {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.nav-btn[data-cat]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      hideContactSection();
       window.history.pushState({}, '', '?cat=' + btn.dataset.cat);
       filterMods(btn.dataset.cat, document.getElementById('searchInput')?.value || '');
     });

@@ -36,9 +36,7 @@
         <!-- BOUTON DE CONNEXION STEAM - MODIFIÉ -->
         <button class="nav-btn login-btn active" onclick="transitionTo('login.html')" data-i18n="nav.login">Se connecter</button>
         <!-- FIN MODIFICATION -->
-        <button class="nav-btn contacts-btn"
-          onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})"
-          data-i18n="nav.contact">Contact</button>
+        <button class="nav-btn contacts-btn" id="navContactBtn" data-i18n="nav.contact">Contact</button>
       </nav>
       <div class="header-right">
         <div class="search-container">
@@ -89,8 +87,8 @@
     <!-- <div id="map" style="height: 400px; width: 100%;"></div> -->
   </main>
 
-  <!-- CONTACT — section à part entière, distincte du footer du site -->
-  <section id="contact" class="contact-section-page">
+  <!-- CONTACT — masquée par défaut, révélée au clic sur le bouton "Contact" de la nav -->
+  <section id="contact" class="contact-section-page" hidden>
     <div class="contact-container">
       <h2 class="contact-heading" data-i18n="contact.title">Nous contacter</h2>
       <p class="contact-sub" data-i18n="contact.sub">Une question, un mod à proposer, un bug à signaler ? Écrivez-nous directement.</p>
